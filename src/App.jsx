@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
-  BatteryCharging,
   Bell,
   Bot,
   CalendarDays,
@@ -39,6 +38,8 @@ import {
   Zap,
 } from "lucide-react";
 import { getDashboard, getLocations, runPipeline } from "./api/dashboard";
+
+const DroneScene3D = lazy(() => import("./components/DroneScene3D"));
 
 const navItems = [
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard },
@@ -206,15 +207,9 @@ function App() {
   const canControlFlight = droneState === "FLYING" || droneState === "SPRAYING";
   const weatherUnsafe = operationTile?.decision_action !== "TAKE_OFF";
   const isSpraying = droneState === "SPRAYING" && !sprayLocked;
-  const droneMotion = droneState === "DOCKED" || droneState === "RETURNING"
-    ? { left: "11%", top: "59%" }
-    : droneState === "SPRAYING"
-      ? { left: "48%", top: "48%" }
-      : { left: "38%", top: "34%" };
   const countdown = formatCountdown(dashboard?.source.reference_time, nextSafeSlot?.timestamp);
   const sceneWeather = getSceneWeather(operationTile);
   const sceneStatus = getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sprayLocked });
-  const sceneVariant = Math.max(locations.findIndex((location) => location.id === dashboard?.location.id), 0) % 3;
   const pipelineStatus = syncing
     ? "Backend đang chạy pipeline..."
     : pipelineRun
@@ -423,91 +418,67 @@ function App() {
 
         <section className="content-grid map-row" id="fields">
           <article className="panel field-panel">
-            <PanelHeading eyebrow="Digital twin · WeatherAPI → Decision Engine" title={`Mô phỏng vận hành 2D · ${dashboard.location.name}`} action={<span className="simulation-live"><i /> Mô phỏng trực tiếp</span>} />
-            <div className={`field-map scene-variant-${sceneVariant} scene-${sceneWeather.type}`}>
-              <div className="scene-field field-a"><i /><i /><i /><i /><i /></div>
-              <div className="scene-field field-b"><i /><i /><i /><i /></div>
-              <div className="scene-field field-c"><i /><i /><i /><i /><i /></div>
-              <div className="scene-field field-d"><i /><i /><i /><i /></div>
-              <div className="scene-river"><span /><span /><span /></div>
-              <div className="scene-road road-main" />
-              <div className="scene-road road-side" />
-              <div className="scene-station">
-                <span><BatteryCharging size={15} /></span>
-                <b>Trạm UAV</b>
-                <small>Dock 01</small>
-              </div>
-              <div className={`scene-weather weather-${sceneWeather.type}`}>
-                {sceneWeather.type === "rain" ? <CloudRain size={14} /> : sceneWeather.type === "wind" ? <Wind size={14} /> : sceneWeather.type === "heat" ? <ThermometerSun size={14} /> : <Check size={14} />}
-                <span>{sceneWeather.label}</span>
-                <Wind size={14} /><span>{operationTile.wind_speed} km/h</span>
-              </div>
-              <div className={`scene-status-banner ${sceneStatus.tone}`}><Clock3 size={14} /><span><b>{sceneStatus.title}</b><small>{sceneStatus.detail}</small></span></div>
-              {sceneWeather.type === "rain" && <div className="weather-layer rain-layer">{Array.from({ length: 13 }, (_, index) => <i style={{ left: `${index * 8 - 4}%`, animationDelay: `${index * -.17}s` }} key={index} />)}</div>}
-              {sceneWeather.type === "wind" && <div className="weather-layer wind-layer">{Array.from({ length: 8 }, (_, index) => <i style={{ top: `${index * 12 + 5}%`, animationDelay: `${index * -.2}s` }} key={index} />)}</div>}
-              {sceneWeather.type === "heat" && <div className="weather-layer heat-layer"><span /><span /><span /></div>}
-              {isAirborne && <div className="flight-path" />}
-              {isSpraying && <div className="spray-trail">{Array.from({ length: 8 }, (_, index) => <i style={{ left: `${index * 12}%`, animationDelay: `${index * -.12}s` }} key={index} />)}</div>}
-              <motion.button
-                aria-label="Xem trạng thái UAV-01"
-                className={`drone-marker drone-${operationAction.tone} state-${droneState.toLowerCase()} ${droneOpen ? "active" : ""}`}
-                onClick={() => setDroneOpen(true)}
-                animate={droneMotion}
-                transition={{ duration: droneState === "RETURNING" ? 2.1 : 1.25, ease: "easeInOut" }}
-                onAnimationComplete={() => {
-                  if (droneState === "RETURNING") {
-                    setDroneState("DOCKED");
-                    notify("UAV-01 đã về trạm Dock 01 an toàn.");
-                  }
-                }}
-                whileHover={{ scale: 1.06 }}
+            <PanelHeading eyebrow="Digital twin · WeatherAPI → Decision Engine" title={`Mô phỏng vận hành 3D · ${dashboard.location.name}`} action={<span className="simulation-live"><i /> 3D tương tác</span>} />
+            <Suspense fallback={<div className="field-map three-field-map three-loading">Đang tải mô phỏng 3D...</div>}>
+              <DroneScene3D
+                weather={sceneWeather}
+                droneState={droneState}
+                isAirborne={isAirborne}
+                isSpraying={isSpraying}
+                location={dashboard.location}
+                operationTile={operationTile}
+                onOpenDrone={() => setDroneOpen(true)}
               >
-                <span className="drone-pulse" />
-                <DroneIllustration />
-                <span className="drone-label"><b>UAV-01 · {droneStateConfig[droneState].label}</b><small>Click để điều khiển và xem telemetry</small></span>
-              </motion.button>
-              <AnimatePresence>
-                {droneOpen && (
-                  <motion.div className="drone-panel" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 18 }}>
-                    <button className="drone-panel-close" aria-label="Đóng trạng thái UAV" onClick={() => setDroneOpen(false)}><X size={15} /></button>
-                    <span className="drone-panel-eyebrow"><Radio size={13} /> UAV-01 · Telemetry trực tiếp</span>
-                    <div className={`operation-alert ${weatherUnsafe ? "danger" : "safe"}`}>
-                      {weatherUnsafe ? <CircleAlert size={14} /> : <Check size={14} />}
-                      <span><b>{weatherUnsafe ? "Điều kiện vận hành thay đổi" : "Điều kiện vận hành ổn định"}</b><small>Mốc mô phỏng {operationTile.time}: {operationAction.title}</small></span>
-                    </div>
-                    <div className="drone-panel-heading">
-                      <div><h3>{droneStateConfig[droneState].label}</h3><p>{dashboard.location.name} · {droneStateConfig[droneState].short}</p></div>
-                      <strong className={`drone-score score-${operationTile.tone}`}>{operationTile.flyability_score}<small>/100</small></strong>
-                    </div>
-                    <div className="drone-stats">
-                      <span><Wind size={13} /><b>{operationTile.wind_speed}</b><small>km/h gió</small></span>
-                      <span><CloudRain size={13} /><b>{operationTile.rain_probability}%</b><small>khả năng mưa</small></span>
-                      <span><Droplets size={13} /><b>{operationTile.dynamic_flow_rate_pct}%</b><small>flow-rate</small></span>
-                    </div>
-                    <div className="drone-controls">
-                      {droneState === "DOCKED" && <button className="control-primary" disabled={!operationTile.schedule_eligible} onClick={launchDrone}><Play size={13} /> Cất cánh</button>}
-                      {(droneState === "FLYING" || droneState === "SPRAYING") && <button className="control-primary" disabled={weatherUnsafe || sprayLocked} onClick={toggleSpraying}><Droplets size={13} /> {droneState === "SPRAYING" ? "Dừng phun" : "Bật phun thuốc"}</button>}
-                      {canControlFlight && <button className="control-warning" disabled={sprayLocked} onClick={lockSpray}><Lock size={13} /> {sprayLocked ? "Đã khóa phun" : "Khóa phun"}</button>}
-                      {canControlFlight && <button className="control-danger" onClick={returnToStation}><House size={13} /> Quay về trạm</button>}
-                    </div>
-                    <p className="simulation-hint">Thử tình huống: chọn giờ xanh → cất cánh → bật phun → chuyển sang giờ cam hoặc đỏ để xử lý cảnh báo.</p>
-                    <div className="drone-timeline-heading"><b>Dự báo vận hành trong ngày</b><small><i /> hiện tại · chọn giờ để mô phỏng</small></div>
-                    <div className="drone-timeline">
-                      {timelineTiles.map((tile) => (
-                        <button className={`timeline-hour hour-${tile.tone} ${operationTile.timestamp === tile.timestamp ? "active" : ""} ${current.timestamp === tile.timestamp ? "is-current" : ""}`} onClick={() => selectSimulationTime(tile)} key={tile.timestamp}>
-                          <span>{tile.time}</span><i /><small>{tile.flyability_score}</small>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="drone-recommendation">{operationTile.recommendation_text}</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              <div className="map-location"><Navigation size={13} /> {dashboard.location.latitude}° N, {dashboard.location.longitude}° E</div>
-            </div>
+                <div className={`scene-weather weather-${sceneWeather.type}`}>
+                  {sceneWeather.type === "rain" ? <CloudRain size={14} /> : sceneWeather.type === "wind" ? <Wind size={14} /> : sceneWeather.type === "heat" ? <ThermometerSun size={14} /> : <Check size={14} />}
+                  <span>{sceneWeather.label}</span>
+                  <Wind size={14} /><span>{operationTile.wind_speed} km/h</span>
+                </div>
+                <div className={`scene-status-banner ${sceneStatus.tone}`}><Clock3 size={14} /><span><b>{sceneStatus.title}</b><small>{sceneStatus.detail}</small></span></div>
+                <button className="drone-open-chip" onClick={() => setDroneOpen(true)}><Radio size={13} /> UAV-01 · {droneStateConfig[droneState].label}</button>
+                <AnimatePresence>
+                  {droneOpen && (
+                    <motion.div className="drone-panel" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 18 }}>
+                      <button className="drone-panel-close" aria-label="Đóng trạng thái UAV" onClick={() => setDroneOpen(false)}><X size={15} /></button>
+                      <span className="drone-panel-eyebrow"><Radio size={13} /> UAV-01 · Telemetry trực tiếp</span>
+                      <div className={`operation-alert ${weatherUnsafe ? "danger" : "safe"}`}>
+                        {weatherUnsafe ? <CircleAlert size={14} /> : <Check size={14} />}
+                        <span><b>{weatherUnsafe ? "Điều kiện vận hành thay đổi" : "Điều kiện vận hành ổn định"}</b><small>Mốc mô phỏng {operationTile.time}: {operationAction.title}</small></span>
+                      </div>
+                      <div className="drone-panel-heading">
+                        <div><h3>{droneStateConfig[droneState].label}</h3><p>{dashboard.location.name} · {droneStateConfig[droneState].short}</p></div>
+                        <strong className={`drone-score score-${operationTile.tone}`}>{operationTile.flyability_score}<small>/100</small></strong>
+                      </div>
+                      <div className="drone-stats">
+                        <span><Wind size={13} /><b>{operationTile.wind_speed}</b><small>km/h gió</small></span>
+                        <span><CloudRain size={13} /><b>{operationTile.rain_probability}%</b><small>khả năng mưa</small></span>
+                        <span><Droplets size={13} /><b>{operationTile.dynamic_flow_rate_pct}%</b><small>flow-rate</small></span>
+                      </div>
+                      <div className="drone-controls">
+                        {droneState === "DOCKED" && <button className="control-primary" disabled={!operationTile.schedule_eligible} onClick={launchDrone}><Play size={13} /> Cất cánh</button>}
+                        {(droneState === "FLYING" || droneState === "SPRAYING") && <button className="control-primary" disabled={weatherUnsafe || sprayLocked} onClick={toggleSpraying}><Droplets size={13} /> {droneState === "SPRAYING" ? "Dừng phun" : "Bật phun thuốc"}</button>}
+                        {canControlFlight && <button className="control-warning" disabled={sprayLocked} onClick={lockSpray}><Lock size={13} /> {sprayLocked ? "Đã khóa phun" : "Khóa phun"}</button>}
+                        {canControlFlight && <button className="control-danger" onClick={returnToStation}><House size={13} /> Quay về trạm</button>}
+                      </div>
+                      <p className="simulation-hint">Kéo trên bản đồ để xoay góc nhìn, cuộn để zoom. Click UAV trong scene để mở telemetry.</p>
+                      <div className="drone-timeline-heading"><b>Dự báo vận hành trong ngày</b><small><i /> hiện tại · chọn giờ để mô phỏng</small></div>
+                      <div className="drone-timeline">
+                        {timelineTiles.map((tile) => (
+                          <button className={`timeline-hour hour-${tile.tone} ${operationTile.timestamp === tile.timestamp ? "active" : ""} ${current.timestamp === tile.timestamp ? "is-current" : ""}`} onClick={() => selectSimulationTime(tile)} key={tile.timestamp}>
+                            <span>{tile.time}</span><i /><small>{tile.flyability_score}</small>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="drone-recommendation">{operationTile.recommendation_text}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <div className="map-location"><Navigation size={13} /> {dashboard.location.latitude}° N, {dashboard.location.longitude}° E</div>
+              </DroneScene3D>
+            </Suspense>
             <div className="map-footer">
               <div className="map-legend"><span className="legend healthy" />Có thể bay <span className="legend stress" />Nên hoãn <span className="legend dry" />Khóa phun / về trạm</div>
-              <span className="data-note">Mô phỏng 2D · {timelineTiles.length} giờ dự báo</span>
+              <span className="data-note">Mô phỏng 3D · Google Maps theo tọa độ · {timelineTiles.length} giờ dự báo</span>
             </div>
           </article>
 
@@ -953,27 +924,6 @@ function WeatherChart({ forecast }) {
       <div className="chart-times">{forecast.map((slot) => <span key={slot.timestamp}>{slot.time}</span>)}</div>
       <div className="chart-summary"><span><i className="temp-line" /> Nhiệt độ</span><span><Wind size={13} /> Gió mạnh nhất <b>{Math.max(...forecast.map((slot) => slot.wind_speed))} km/h</b></span><span><CloudRain size={13} /> Mưa cao nhất <b>{Math.max(...forecast.map((slot) => slot.rain_probability))}%</b></span></div>
     </div>
-  );
-}
-
-function DroneIllustration() {
-  return (
-    <svg className="drone-illustration" viewBox="0 0 124 78" aria-hidden="true">
-      <g className="drone-propellers">
-        <ellipse cx="24" cy="17" rx="21" ry="6" />
-        <ellipse cx="100" cy="17" rx="21" ry="6" />
-        <ellipse cx="24" cy="60" rx="21" ry="6" />
-        <ellipse cx="100" cy="60" rx="21" ry="6" />
-      </g>
-      <g className="drone-frame">
-        <path d="M35 27 23 18M89 27l12-9M35 51 23 60M89 51l12 9" />
-        <circle cx="23" cy="18" r="7" /><circle cx="101" cy="18" r="7" /><circle cx="23" cy="60" r="7" /><circle cx="101" cy="60" r="7" />
-        <path d="M48 25h28l12 13-12 14H48L36 38Z" />
-        <path d="M53 52h18l-3 10H56Z" />
-      </g>
-      <circle className="drone-camera" cx="62" cy="39" r="7" />
-      <circle className="drone-camera-lens" cx="62" cy="39" r="3" />
-    </svg>
   );
 }
 

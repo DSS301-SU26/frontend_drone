@@ -134,6 +134,19 @@ h1, h2, h3 { margin: 0; font-family: "Manrope", sans-serif; letter-spacing: -.7p
 .simulation-live { display: flex; gap: 5px; align-items: center; padding: 5px 7px; color: #4b9275 !important; border-radius: 20px; background: #e9f7ef; font-size: 8px !important; }.simulation-live i { width: 6px; height: 6px; border-radius: 50%; background: #50ad80; box-shadow: 0 0 0 3px rgba(80,173,128,.16); animation: pulse 2s infinite; }
 .field-map { position: relative; height: 428px; overflow: hidden; border-radius: 11px; background: linear-gradient(145deg, #9cc783, #70a96f); isolation: isolate; }
 .field-map::before { position: absolute; inset: 0; content: ""; opacity: .32; background-image: linear-gradient(rgba(255,255,255,.22) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.18) 1px, transparent 1px); background-size: 22px 22px; }
+.three-field-map { height: 520px; background: #9bcf8b; cursor: grab; }
+.three-loading { display: grid; place-items: center; color: #537268; font-size: 12px; font-weight: 800; }
+.three-field-map:active { cursor: grabbing; }
+.three-field-map::before { display: none; }
+.three-field-map canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.three-field-map.is-drone-hovered { cursor: pointer; }
+.three-overlay { position: absolute; z-index: 8; inset: 0; pointer-events: none; }
+.three-overlay > * { pointer-events: auto; }
+.three-controls { position: absolute; z-index: 6; left: 10px; bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.three-controls span, .google-map-link, .drone-open-chip { display: flex; gap: 5px; align-items: center; padding: 7px 9px; color: #4f6b62; border: 1px solid rgba(255,255,255,.66); border-radius: 20px; background: rgba(255,255,255,.82); box-shadow: 0 7px 16px rgba(37,68,59,.1); backdrop-filter: blur(7px); font-size: 9px; font-weight: 800; text-decoration: none; }
+.google-map-link { position: absolute; z-index: 6; right: 8px; top: 9px; color: var(--green-800); }
+.google-map-link:hover, .drone-open-chip:hover { color: var(--green-950); background: white; }
+.drone-open-chip { position: absolute; z-index: 7; right: 10px; bottom: 39px; border-radius: 8px; }
 .scene-field { position: absolute; display: flex; justify-content: space-around; padding: 8px; overflow: hidden; border: 2px solid rgba(238,249,213,.46); border-radius: 10px; background: rgba(106,155,69,.55); box-shadow: inset 0 0 0 3px rgba(58,113,53,.08); transform: rotate(-7deg); }
 .scene-field i { width: 5px; height: 130%; margin-top: -10%; border-radius: 5px; background: repeating-linear-gradient(180deg, #d1e58c 0 4px, #80b15c 4px 10px); box-shadow: 6px 0 rgba(208,230,138,.36); }
 .field-a { top: -5%; left: -5%; width: 34%; height: 46%; }.field-b { right: -4%; top: -8%; width: 37%; height: 39%; }.field-c { bottom: -5%; left: -4%; width: 40%; height: 38%; }.field-d { right: -7%; bottom: -8%; width: 38%; height: 42%; }
@@ -158,7 +171,7 @@ h1, h2, h3 { margin: 0; font-family: "Manrope", sans-serif; letter-spacing: -.7p
 .drone-label { position: absolute; z-index: 3; bottom: 1px; left: 18px; display: grid; min-width: 112px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.64); border-radius: 7px; background: rgba(34,78,69,.8); backdrop-filter: blur(4px); }.drone-label b { font-size: 9px; letter-spacing: .5px; }.drone-label small { margin-top: 2px; color: #c4e3da; font-size: 8px; }
 .drone-marker.active .drone-label, .drone-marker:hover .drone-label { background: rgba(28,92,78,.94); }.drone-dry .drone-label { background: rgba(144,77,59,.88); }.drone-stress .drone-label { background: rgba(167,115,51,.9); }
 .drone-panel { position: absolute; z-index: 9; top: 12px; right: 12px; width: min(342px, calc(100% - 24px)); padding: 13px; color: #51645e; border: 1px solid rgba(255,255,255,.85); border-radius: 11px; background: rgba(255,255,255,.94); box-shadow: 0 15px 35px rgba(36,71,60,.22); backdrop-filter: blur(9px); }
-.drone-panel-close { position: absolute; top: 9px; right: 9px; display: grid; width: 24px; height: 24px; place-items: center; color: #83918d; border-radius: 50%; background: #eff3f1; }.drone-panel-eyebrow { display: flex; gap: 5px; align-items: center; color: #588777; font-size: 8px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; }
+.drone-panel-close { position: absolute; z-index: 2; top: 9px; right: 9px; display: grid; width: 28px; height: 28px; place-items: center; color: #63756f; border: 1px solid rgba(73,93,86,.08); border-radius: 50%; background: #eff3f1; box-shadow: 0 5px 12px rgba(38,65,56,.1); }.drone-panel-close:hover { color: #2f5147; background: white; }.drone-panel-eyebrow { display: flex; gap: 5px; align-items: center; color: #588777; font-size: 8px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; }
 .operation-alert { display: flex; gap: 6px; align-items: center; padding: 7px 8px; margin-top: 9px; color: #578675; border-radius: 7px; background: #edf7f2; }.operation-alert svg { flex: 0 0 auto; }.operation-alert b, .operation-alert small { display: block; }.operation-alert b { font-size: 9px; }.operation-alert small { margin-top: 2px; color: #8d9e98; font-size: 8px; }.operation-alert.danger { color: #ae604d; background: #fff0eb; }
 .drone-panel-heading { display: flex; gap: 9px; align-items: center; justify-content: space-between; margin-top: 9px; }.drone-panel-heading h3 { color: #3d554d; font-size: 15px; }.drone-panel-heading p { margin: 4px 0 0; color: #99a39f; font-size: 9px; }
 .drone-score { color: #4f9278; font-family: "Manrope"; font-size: 25px; letter-spacing: -1px; }.drone-score small { color: #9eaaa5; font-size: 9px; letter-spacing: 0; }.score-dry { color: #c17155; }.score-stress { color: #d09045; }
