@@ -562,30 +562,30 @@ function RealDataDashboard({ analytics, source, lastSyncedAt, pipelineRun }) {
     <div className="real-data-stack">
       <div className="real-summary-grid">
         {analytics.summary.map((item) => (
-          <article className="real-summary-card" key={item.label}>
+          <motion.article className="real-summary-card" key={item.label} whileHover={{ y: -4 }} whileTap={{ scale: .99 }}>
             <span>{item.label}</span>
             <strong>{item.value}<em>{item.suffix}</em></strong>
             <small>{item.note}</small>
-          </article>
+          </motion.article>
         ))}
       </div>
       <div className="chart-grid analytics-charts">
-        <article className="panel chart-panel">
+        <motion.article className="panel chart-panel interactive-panel" whileHover={{ y: -4 }} whileTap={{ scale: .995 }}>
           <PanelHeading eyebrow="Biểu đồ cột" title="Xác suất mưa theo giờ" action={<span className="source-pill">{analytics.rows.length} mốc</span>} />
           <VerticalBarChart data={analytics.rows} valueKey="rain_probability" suffix="%" color="#4f8ca9" />
-        </article>
-        <article className="panel chart-panel">
+        </motion.article>
+        <motion.article className="panel chart-panel interactive-panel" whileHover={{ y: -4 }} whileTap={{ scale: .995 }}>
           <PanelHeading eyebrow="Biểu đồ ngang" title="Điểm bay từng khung giờ" action={<Sparkles size={17} className="sparkle" />} />
           <HorizontalBarChart data={analytics.rows} valueKey="flyability_score" suffix="/100" />
-        </article>
-        <article className="panel chart-panel">
+        </motion.article>
+        <motion.article className="panel chart-panel interactive-panel" whileHover={{ y: -4 }} whileTap={{ scale: .995 }}>
           <PanelHeading eyebrow="Biểu đồ đường" title="Nhiệt độ forecast trong ngày" action={<ThermometerSun size={17} className="sparkle" />} />
           <LineTrendChart data={analytics.rows} valueKey="temperature" suffix="°C" />
-        </article>
-        <article className="panel chart-panel">
+        </motion.article>
+        <motion.article className="panel chart-panel interactive-panel" whileHover={{ y: -4 }} whileTap={{ scale: .995 }}>
           <PanelHeading eyebrow="Biểu đồ tròn" title="Tỷ trọng quyết định" action={<span className="source-pill">{source.dataset}</span>} />
           <DecisionDonutChart segments={analytics.actionSegments} />
-        </article>
+        </motion.article>
       </div>
       <div className="data-freshness">
         <span><Radio size={13} /> Reference time: <b>{formatDateTime(source.reference_time)}</b></span>
@@ -608,42 +608,86 @@ function RealDataDashboard({ analytics, source, lastSyncedAt, pipelineRun }) {
 }
 
 function VerticalBarChart({ data, valueKey, suffix, color }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
   const maxValue = Math.max(...data.map((item) => Number(item[valueKey]) || 0), 1);
+  const activeItem = activeIndex === null ? null : data[activeIndex];
+  const handlePointerMove = (event) => {
+    if (!data.length) return;
+    setActiveIndex(getPointerIndex(event, data.length));
+  };
+
   return (
-    <div className="bar-chart">
-      {data.map((item) => {
+    <div
+      className={`bar-chart interactive-chart ${isScrubbing ? "scrubbing" : ""}`}
+      onPointerDown={(event) => { setIsScrubbing(true); handlePointerMove(event); }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={() => setIsScrubbing(false)}
+      onPointerLeave={() => { setActiveIndex(null); setIsScrubbing(false); }}
+    >
+      {data.map((item, index) => {
         const value = Number(item[valueKey]) || 0;
         return (
-          <div className="bar-column" key={item.timestamp}>
+          <div className={`bar-column ${activeIndex === index ? "active" : ""}`} onPointerEnter={() => setActiveIndex(index)} key={item.timestamp}>
             <b>{formatNumber(value)}{suffix}</b>
             <span style={{ height: `${Math.max((value / maxValue) * 100, 3)}%`, background: color }} />
             <small>{item.time}</small>
           </div>
         );
       })}
+      {activeItem && (
+        <div className="chart-tooltip" style={{ left: `${getTooltipLeft(activeIndex, data.length)}%` }}>
+          <b>{activeItem.time}</b>
+          <span>{formatNumber(activeItem[valueKey])}{suffix} mưa</span>
+          <small>{actionConfig[activeItem.decision_action]?.short ?? activeItem.decision_action}</small>
+        </div>
+      )}
     </div>
   );
 }
 
 function HorizontalBarChart({ data, valueKey, suffix }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const activeItem = activeIndex === null ? null : data[activeIndex];
+  const handlePointerMove = (event) => {
+    if (!data.length) return;
+    setActiveIndex(getPointerIndexByY(event, data.length));
+  };
+
   return (
-    <div className="horizontal-bars">
-      {data.slice(0, 10).map((item) => {
+    <div
+      className={`horizontal-bars interactive-chart ${isScrubbing ? "scrubbing" : ""}`}
+      onPointerDown={(event) => { setIsScrubbing(true); handlePointerMove(event); }}
+      onPointerMove={(event) => { if (isScrubbing) handlePointerMove(event); }}
+      onPointerUp={() => setIsScrubbing(false)}
+      onPointerLeave={() => { setActiveIndex(null); setIsScrubbing(false); }}
+    >
+      {data.map((item, index) => {
         const value = Number(item[valueKey]) || 0;
         const tone = actionConfig[item.decision_action]?.tone ?? "stress";
         return (
-          <div className={`horizontal-row ${tone}`} key={item.timestamp}>
+          <div className={`horizontal-row ${tone} ${activeIndex === index ? "active" : ""}`} onPointerEnter={() => setActiveIndex(index)} key={item.timestamp}>
             <span>{item.time}</span>
             <div><i style={{ width: `${clamp(value, 0, 100)}%` }} /></div>
             <b>{formatNumber(value)}{suffix}</b>
           </div>
         );
       })}
+      {activeItem && (
+        <div className="horizontal-tooltip">
+          <b>{activeItem.time}</b>
+          <span>{formatNumber(activeItem[valueKey])}{suffix}</span>
+          <small>{actionConfig[activeItem.decision_action]?.title ?? activeItem.decision_action}</small>
+        </div>
+      )}
     </div>
   );
 }
 
 function LineTrendChart({ data, valueKey, suffix }) {
+  const [activeIndex, setActiveIndex] = useState(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
   const values = data.map((item) => Number(item[valueKey]) || 0);
   if (!values.length) {
     return <div className="empty-chart">Chưa có dữ liệu forecast để vẽ biểu đồ.</div>;
@@ -654,14 +698,37 @@ function LineTrendChart({ data, valueKey, suffix }) {
   const width = 520;
   const step = width / Math.max(values.length - 1, 1);
   const points = values.map((value, index) => `${index * step},${112 - ((value - min) / range) * 88}`).join(" ");
+  const activeValue = activeIndex === null ? null : values[activeIndex];
+  const activeX = activeIndex === null ? 0 : activeIndex * step;
+  const activeY = activeValue === null ? 0 : 112 - ((activeValue - min) / range) * 88;
+  const activeItem = activeIndex === null ? null : data[activeIndex];
+  const handlePointerMove = (event) => {
+    if (!data.length) return;
+    setActiveIndex(getPointerIndex(event, data.length));
+  };
 
   return (
-    <div className="line-chart">
+    <div
+      className={`line-chart interactive-chart ${isScrubbing ? "scrubbing" : ""}`}
+      onPointerDown={(event) => { setIsScrubbing(true); handlePointerMove(event); }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={() => setIsScrubbing(false)}
+      onPointerLeave={() => { setActiveIndex(null); setIsScrubbing(false); }}
+    >
       <svg viewBox="0 0 520 136" preserveAspectRatio="none">
         {[24, 56, 88, 120].map((y) => <line x1="0" x2="520" y1={y} y2={y} key={y} />)}
+        {activeItem && <line className="line-guide" x1={activeX} x2={activeX} y1="18" y2="123" />}
         <polyline points={points} fill="none" stroke="#db7c34" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {values.map((value, index) => <circle cx={index * step} cy={112 - ((value - min) / range) * 88} r="4" key={`${data[index]?.timestamp}-${value}`} />)}
+        {values.map((value, index) => <circle className={activeIndex === index ? "active" : ""} cx={index * step} cy={112 - ((value - min) / range) * 88} r={activeIndex === index ? "6" : "4"} key={`${data[index]?.timestamp}-${value}`} />)}
+        {activeItem && <circle className="line-pulse" cx={activeX} cy={activeY} r="10" />}
       </svg>
+      {activeItem && (
+        <div className="chart-tooltip line-tooltip" style={{ left: `${getTooltipLeft(activeIndex, data.length)}%` }}>
+          <b>{activeItem.time}</b>
+          <span>{formatNumber(activeValue)}{suffix}</span>
+          <small>Gió {formatNumber(activeItem.wind_speed)} km/h · Mưa {formatNumber(activeItem.rain_probability)}%</small>
+        </div>
+      )}
       <div className="line-chart-meta">
         <span>Thấp nhất <b>{formatNumber(Math.min(...values))}{suffix}</b></span>
         <span>Cao nhất <b>{formatNumber(Math.max(...values))}{suffix}</b></span>
@@ -672,18 +739,21 @@ function LineTrendChart({ data, valueKey, suffix }) {
 }
 
 function DecisionDonutChart({ segments }) {
+  const [activeKey, setActiveKey] = useState("");
   const gradient = buildDecisionGradient(segments);
   const total = segments.reduce((sum, segment) => sum + segment.count, 0);
+  const activeSegment = segments.find((segment) => segment.key === activeKey);
   return (
-    <div className="donut-chart-wrap">
-      <div className="donut-chart" style={{ background: gradient }}>
+    <div className="donut-chart-wrap interactive-chart">
+      <motion.div className={`donut-chart ${activeSegment ? "active" : ""}`} style={{ background: gradient }} whileHover={{ scale: 1.04 }} whileTap={{ scale: .97 }}>
         <span><b>{total}</b><small>quyết định</small></span>
-      </div>
+      </motion.div>
       <div className="donut-legend">
         {segments.map((segment) => (
-          <span key={segment.key}><i style={{ background: segment.color }} /> {segment.label} <b>{segment.count}</b></span>
+          <span className={activeKey === segment.key ? "active" : ""} onPointerEnter={() => setActiveKey(segment.key)} onPointerLeave={() => setActiveKey("")} key={segment.key}><i style={{ background: segment.color }} /> {segment.label} <b>{segment.count}</b></span>
         ))}
       </div>
+      {activeSegment && <div className="donut-tooltip"><b>{activeSegment.label}</b><span>{activeSegment.count}/{total} quyết định</span></div>}
     </div>
   );
 }
@@ -815,6 +885,23 @@ function formatNumber(value) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function getPointerIndex(event, count) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const progress = clamp((event.clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
+  return clamp(Math.round(progress * (count - 1)), 0, count - 1);
+}
+
+function getPointerIndexByY(event, count) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const progress = clamp((event.clientY - rect.top) / Math.max(rect.height, 1), 0, 1);
+  return clamp(Math.round(progress * (count - 1)), 0, count - 1);
+}
+
+function getTooltipLeft(index, count) {
+  if (index === null || count <= 1) return 0;
+  return clamp((index / (count - 1)) * 100, 8, 92);
 }
 
 function WeatherChart({ forecast }) {
