@@ -1,10 +1,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-async function request(path) {
-  const response = await fetch(`${API_BASE_URL}${path}`);
+async function request(path, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store", ...options });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.detail ?? "Không thể kết nối Agricultural Drone Scheduler API.");
+    const detail = payload.detail?.message ?? payload.detail ?? "Không thể kết nối Agricultural Drone Scheduler API.";
+    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   return response.json();
 }
@@ -14,5 +15,17 @@ export function getLocations() {
 }
 
 export function getDashboard(location) {
-  return request(`/api/dashboard?location=${encodeURIComponent(location)}`);
+  const params = new URLSearchParams({
+    location,
+    refresh: Date.now().toString(),
+  });
+  return request(`/api/dashboard?${params.toString()}`);
+}
+
+export function runPipeline({ days = 3, skipUpload = false } = {}) {
+  const params = new URLSearchParams({
+    days: days.toString(),
+    skip_upload: skipUpload ? "true" : "false",
+  });
+  return request(`/api/pipeline/run?${params.toString()}`, { method: "POST" });
 }

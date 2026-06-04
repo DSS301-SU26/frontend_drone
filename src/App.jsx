@@ -38,7 +38,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { getDashboard, getLocations } from "./api/dashboard";
+import { getDashboard, getLocations, runPipeline } from "./api/dashboard";
 
 const navItems = [
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard },
@@ -86,6 +86,8 @@ const droneStateConfig = {
   RETURNING: { label: "Đang quay về trạm", short: "Đang điều hướng về Dock 01" },
 };
 
+const DAILY_SYNC_KEY = "agriflight:last-daily-sync";
+
 function App() {
   const [locations, setLocations] = useState([]);
   const [locationId, setLocationId] = useState("Dong Thap");
@@ -102,6 +104,8 @@ function App() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState("");
+  const [pipelineRun, setPipelineRun] = useState(null);
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -119,6 +123,8 @@ function App() {
       setOperationTimestamp(payload.current.timestamp);
       setDroneState("DOCKED");
       setSprayLocked(false);
+      const syncedAt = new Date();
+      setLastSyncedAt(syncedAt.toISOString());
       if (showToast) notify("Đã đồng bộ dữ liệu mới nhất từ Agricultural Drone Scheduler.");
     } catch (requestError) {
       setError(requestError.message);
@@ -127,6 +133,24 @@ function App() {
     }
   }, [locationId, notify]);
 
+  const executePipelineRefresh = useCallback(async (showToast = true) => {
+    setSyncing(true);
+    setError("");
+    try {
+      if (showToast) notify("Backend đang chạy lại pipeline: fetch → clean → upload. Vui lòng chờ...");
+      const pipelinePayload = await runPipeline({ days: 3 });
+      setPipelineRun(pipelinePayload);
+      window.localStorage.setItem(DAILY_SYNC_KEY, getLocalDateKey());
+      await loadDashboard(false);
+      if (showToast) notify(`Pipeline đã chạy xong. File mới: ${getFilename(pipelinePayload.clean_path)}.`);
+    } catch (requestError) {
+      setError(requestError.message);
+      notify(`Chạy pipeline thất bại: ${requestError.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [loadDashboard, notify]);
+
   useEffect(() => {
     getLocations().then(setLocations).catch((requestError) => setError(requestError.message));
   }, []);
@@ -134,6 +158,32 @@ function App() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    let midnightTimeout;
+
+    const refreshIfNewDay = () => {
+      if (window.localStorage.getItem(DAILY_SYNC_KEY) !== getLocalDateKey()) {
+        executePipelineRefresh(false);
+      }
+    };
+
+    const scheduleMidnightSync = () => {
+      midnightTimeout = window.setTimeout(() => {
+        refreshIfNewDay();
+        scheduleMidnightSync();
+      }, getMsUntilNextLocalDay());
+    };
+
+    refreshIfNewDay();
+    scheduleMidnightSync();
+    const wakeupCheck = window.setInterval(refreshIfNewDay, 5 * 60 * 1000);
+
+    return () => {
+      window.clearTimeout(midnightTimeout);
+      window.clearInterval(wakeupCheck);
+    };
+  }, [executePipelineRefresh]);
 
   const current = dashboard?.current;
   const action = actionConfig[current?.decision_action] ?? actionConfig.DELAY_FLIGHT;
@@ -148,6 +198,7 @@ function App() {
     })),
     [dashboard],
   );
+  const analytics = useMemo(() => buildDashboardAnalytics(dashboard), [dashboard]);
   const operationTile = timelineTiles.find((tile) => tile.timestamp === operationTimestamp) ?? current;
   const operationAction = actionConfig[operationTile?.decision_action] ?? actionConfig.DELAY_FLIGHT;
   const nextSafeSlot = timelineTiles.find((tile) => tile.schedule_eligible) ?? slots.find((tile) => tile.schedule_eligible);
@@ -163,6 +214,11 @@ function App() {
   const countdown = formatCountdown(dashboard?.source.reference_time, nextSafeSlot?.timestamp);
   const sceneStatus = getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sprayLocked });
   const sceneVariant = Math.max(locations.findIndex((location) => location.id === dashboard?.location.id), 0) % 3;
+  const pipelineStatus = syncing
+    ? "Backend đang chạy pipeline..."
+    : pipelineRun
+      ? `Pipeline mới: ${getFilename(pipelineRun.clean_path)}`
+      : "Pipeline sẵn sàng chạy lại";
   const recentActivity = useMemo(() => {
     if (!dashboard || !current) return [];
     return [
@@ -307,7 +363,9 @@ function App() {
           </div>
           <div className="toolbar-right">
             <span>Nguồn: {dashboard.source.dataset}</span>
-            <button className="outline-btn" onClick={() => loadDashboard(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> Đồng bộ dữ liệu</button>
+            <span>Cập nhật: {formatDateTime(dashboard.source.updated_at)}</span>
+            <span>{pipelineStatus}</span>
+            <button className="outline-btn" disabled={syncing} onClick={() => executePipelineRefresh(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> {syncing ? "Đang chạy pipeline" : "Chạy lại dữ liệu"}</button>
           </div>
         </section>
 
@@ -465,7 +523,12 @@ function App() {
         </section>
 
         <section className="kpi-section" id="analytics">
-          <div className="section-heading"><div><span>Backtesting report</span><h2>KPI mô phỏng của Decision Engine</h2></div><button className="outline-btn" onClick={() => notify("KPI lấy từ reports/backtesting_summary.json")}><Gauge size={15} /> Nguồn báo cáo thật</button></div>
+          <div className="section-heading">
+            <div><span>Dữ liệu thật từ BackEnd</span><h2>Số liệu và biểu đồ quyết định mới nhất</h2></div>
+            <button className="outline-btn" disabled={syncing} onClick={() => executePipelineRefresh(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> {syncing ? "Đang chạy" : "Chạy lại"}</button>
+          </div>
+          <RealDataDashboard analytics={analytics} source={dashboard.source} lastSyncedAt={lastSyncedAt} pipelineRun={pipelineRun} />
+          <div className="section-heading kpi-heading"><div><span>Backtesting report</span><h2>KPI mô phỏng của Decision Engine</h2></div><button className="outline-btn" onClick={() => notify("KPI lấy từ reports/backtesting_summary.json")}><Gauge size={15} /> Nguồn báo cáo thật</button></div>
           <div className="kpi-grid">
             {dashboard.kpis.map((kpi) => (
               <article className={`kpi-card ${kpi.tone}`} key={kpi.key}><span>{kpi.label}</span><strong>{kpi.value}{kpi.suffix}</strong><small><Check size={13} /> {kpi.note}</small><MiniBars tone={kpi.tone} /></article>
@@ -494,6 +557,137 @@ function PanelHeading({ eyebrow, title, action }) {
   return <div className="panel-heading"><div><span>{eyebrow}</span><h2>{title}</h2></div>{action}</div>;
 }
 
+function RealDataDashboard({ analytics, source, lastSyncedAt, pipelineRun }) {
+  return (
+    <div className="real-data-stack">
+      <div className="real-summary-grid">
+        {analytics.summary.map((item) => (
+          <article className="real-summary-card" key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}<em>{item.suffix}</em></strong>
+            <small>{item.note}</small>
+          </article>
+        ))}
+      </div>
+      <div className="chart-grid analytics-charts">
+        <article className="panel chart-panel">
+          <PanelHeading eyebrow="Biểu đồ cột" title="Xác suất mưa theo giờ" action={<span className="source-pill">{analytics.rows.length} mốc</span>} />
+          <VerticalBarChart data={analytics.rows} valueKey="rain_probability" suffix="%" color="#4f8ca9" />
+        </article>
+        <article className="panel chart-panel">
+          <PanelHeading eyebrow="Biểu đồ ngang" title="Điểm bay từng khung giờ" action={<Sparkles size={17} className="sparkle" />} />
+          <HorizontalBarChart data={analytics.rows} valueKey="flyability_score" suffix="/100" />
+        </article>
+        <article className="panel chart-panel">
+          <PanelHeading eyebrow="Biểu đồ đường" title="Nhiệt độ forecast trong ngày" action={<ThermometerSun size={17} className="sparkle" />} />
+          <LineTrendChart data={analytics.rows} valueKey="temperature" suffix="°C" />
+        </article>
+        <article className="panel chart-panel">
+          <PanelHeading eyebrow="Biểu đồ tròn" title="Tỷ trọng quyết định" action={<span className="source-pill">{source.dataset}</span>} />
+          <DecisionDonutChart segments={analytics.actionSegments} />
+        </article>
+      </div>
+      <div className="data-freshness">
+        <span><Radio size={13} /> Reference time: <b>{formatDateTime(source.reference_time)}</b></span>
+        <span><Clock3 size={13} /> FE đồng bộ lần cuối: <b>{formatDateTime(lastSyncedAt)}</b></span>
+        {pipelineRun && <span><Check size={13} /> Pipeline gần nhất: <b>{getFilename(pipelineRun.clean_path)}</b></span>}
+        <span><RefreshCw size={13} /> Tự chạy lại 1 lần khi sang ngày mới</span>
+      </div>
+      {pipelineRun?.steps?.length > 0 && (
+        <div className="pipeline-steps">
+          {pipelineRun.steps.map((step, index) => (
+            <span className={`pipeline-step ${step.status}`} key={step.name}>
+              <b>{index + 1}</b>
+              {formatPipelineStep(step)}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VerticalBarChart({ data, valueKey, suffix, color }) {
+  const maxValue = Math.max(...data.map((item) => Number(item[valueKey]) || 0), 1);
+  return (
+    <div className="bar-chart">
+      {data.map((item) => {
+        const value = Number(item[valueKey]) || 0;
+        return (
+          <div className="bar-column" key={item.timestamp}>
+            <b>{formatNumber(value)}{suffix}</b>
+            <span style={{ height: `${Math.max((value / maxValue) * 100, 3)}%`, background: color }} />
+            <small>{item.time}</small>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function HorizontalBarChart({ data, valueKey, suffix }) {
+  return (
+    <div className="horizontal-bars">
+      {data.slice(0, 10).map((item) => {
+        const value = Number(item[valueKey]) || 0;
+        const tone = actionConfig[item.decision_action]?.tone ?? "stress";
+        return (
+          <div className={`horizontal-row ${tone}`} key={item.timestamp}>
+            <span>{item.time}</span>
+            <div><i style={{ width: `${clamp(value, 0, 100)}%` }} /></div>
+            <b>{formatNumber(value)}{suffix}</b>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LineTrendChart({ data, valueKey, suffix }) {
+  const values = data.map((item) => Number(item[valueKey]) || 0);
+  if (!values.length) {
+    return <div className="empty-chart">Chưa có dữ liệu forecast để vẽ biểu đồ.</div>;
+  }
+  const min = Math.floor(Math.min(...values, 0));
+  const max = Math.ceil(Math.max(...values, 1));
+  const range = Math.max(max - min, 1);
+  const width = 520;
+  const step = width / Math.max(values.length - 1, 1);
+  const points = values.map((value, index) => `${index * step},${112 - ((value - min) / range) * 88}`).join(" ");
+
+  return (
+    <div className="line-chart">
+      <svg viewBox="0 0 520 136" preserveAspectRatio="none">
+        {[24, 56, 88, 120].map((y) => <line x1="0" x2="520" y1={y} y2={y} key={y} />)}
+        <polyline points={points} fill="none" stroke="#db7c34" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {values.map((value, index) => <circle cx={index * step} cy={112 - ((value - min) / range) * 88} r="4" key={`${data[index]?.timestamp}-${value}`} />)}
+      </svg>
+      <div className="line-chart-meta">
+        <span>Thấp nhất <b>{formatNumber(Math.min(...values))}{suffix}</b></span>
+        <span>Cao nhất <b>{formatNumber(Math.max(...values))}{suffix}</b></span>
+        <span>Trung bình <b>{formatNumber(average(values))}{suffix}</b></span>
+      </div>
+    </div>
+  );
+}
+
+function DecisionDonutChart({ segments }) {
+  const gradient = buildDecisionGradient(segments);
+  const total = segments.reduce((sum, segment) => sum + segment.count, 0);
+  return (
+    <div className="donut-chart-wrap">
+      <div className="donut-chart" style={{ background: gradient }}>
+        <span><b>{total}</b><small>quyết định</small></span>
+      </div>
+      <div className="donut-legend">
+        {segments.map((segment) => (
+          <span key={segment.key}><i style={{ background: segment.color }} /> {segment.label} <b>{segment.count}</b></span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function formatCountdown(referenceTime, slotTimestamp) {
   if (!referenceTime || !slotTimestamp) return "";
   const minutes = Math.round((new Date(slotTimestamp) - new Date(referenceTime)) / 60000);
@@ -511,6 +705,116 @@ function getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sp
   if (droneState === "FLYING") return { tone: "safe", title: "UAV đang bay giám sát", detail: "Chọn một mốc giờ xấu để mô phỏng thay đổi thời tiết" };
   if (nextSafeSlot) return { tone: "safe", title: `Sắp tới giờ bay · ${nextSafeSlot.time}`, detail: countdown };
   return { tone: "warning", title: "UAV đang chờ tại trạm", detail: "Chưa có slot TAKE_OFF an toàn trong forecast" };
+}
+
+function buildDashboardAnalytics(dashboard) {
+  const rows = (dashboard?.timeline_tiles?.length ? dashboard.timeline_tiles : dashboard?.forecast ?? []).slice(0, 12);
+  const scores = rows.map((row) => Number(row.flyability_score) || 0);
+  const winds = rows.map((row) => Number(row.wind_speed) || 0);
+  const rains = rows.map((row) => Number(row.rain_probability) || 0);
+  const temps = rows.map((row) => Number(row.temperature) || 0);
+  const safeSlots = rows.filter((row) => row.schedule_eligible).length;
+  const actionSegments = buildActionSegments(rows);
+
+  return {
+    rows,
+    actionSegments,
+    summary: [
+      { label: "Forecast nhận từ BE", value: rows.length, suffix: " mốc", note: dashboard?.source?.dataset ?? "Đang chờ dữ liệu" },
+      { label: "Slot bay an toàn", value: safeSlots, suffix: `/${rows.length}`, note: `${formatNumber((safeSlots / Math.max(rows.length, 1)) * 100)}% khung giờ TAKE_OFF` },
+      { label: "Điểm bay trung bình", value: formatNumber(average(scores)), suffix: "/100", note: `Cao nhất ${formatNumber(Math.max(...scores, 0))}/100` },
+      { label: "Điều kiện nổi bật", value: formatNumber(Math.max(...rains, 0)), suffix: "% mưa", note: `Gió TB ${formatNumber(average(winds))} km/h · Nhiệt TB ${formatNumber(average(temps))}°C` },
+    ],
+  };
+}
+
+function buildActionSegments(rows) {
+  const colors = {
+    TAKE_OFF: "#65a875",
+    DELAY_FLIGHT: "#dca04c",
+    LOCK_SPRAY: "#c56d51",
+    RETURN_TO_CHARGING: "#4f8ca9",
+  };
+  const counts = rows.reduce((totals, row) => {
+    totals[row.decision_action] = (totals[row.decision_action] ?? 0) + 1;
+    return totals;
+  }, {});
+  return Object.entries(counts).map(([key, count]) => ({
+    key,
+    count,
+    label: actionConfig[key]?.short ?? key,
+    color: colors[key] ?? "#9aa6a2",
+  }));
+}
+
+function buildDecisionGradient(segments) {
+  const total = segments.reduce((sum, segment) => sum + segment.count, 0);
+  if (!total) return "conic-gradient(#edf0ed 0deg 360deg)";
+  let cursor = 0;
+  const stops = segments.map((segment) => {
+    const start = cursor;
+    cursor += (segment.count / total) * 360;
+    return `${segment.color} ${start}deg ${cursor}deg`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
+}
+
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getMsUntilNextLocalDay() {
+  const now = new Date();
+  const nextDay = new Date(now);
+  nextDay.setHours(24, 0, 5, 0);
+  return Math.max(nextDay.getTime() - now.getTime(), 1000);
+}
+
+function formatDateTime(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getFilename(path) {
+  if (!path) return "--";
+  return path.split(/[\\/]/).pop();
+}
+
+function formatPipelineStep(step) {
+  const labels = {
+    fetch_weather: "Lấy WeatherAPI",
+    clean_data: "Làm sạch dữ liệu",
+    upload_supabase: "Upload Supabase",
+  };
+  const rows = step.rows ? ` · ${step.rows} dòng` : "";
+  const warning = step.status === "warning" ? " · cảnh báo" : "";
+  const skipped = step.status === "skipped" ? " · bỏ qua" : "";
+  return `${labels[step.name] ?? step.name}${rows}${warning}${skipped}`;
+}
+
+function average(values) {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function formatNumber(value) {
+  const rounded = Math.round((Number(value) || 0) * 10) / 10;
+  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1);
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function WeatherChart({ forecast }) {
