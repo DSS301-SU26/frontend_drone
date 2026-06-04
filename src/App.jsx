@@ -212,6 +212,7 @@ function App() {
       ? { left: "48%", top: "48%" }
       : { left: "38%", top: "34%" };
   const countdown = formatCountdown(dashboard?.source.reference_time, nextSafeSlot?.timestamp);
+  const sceneWeather = getSceneWeather(operationTile);
   const sceneStatus = getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sprayLocked });
   const sceneVariant = Math.max(locations.findIndex((location) => location.id === dashboard?.location.id), 0) % 3;
   const pipelineStatus = syncing
@@ -423,7 +424,7 @@ function App() {
         <section className="content-grid map-row" id="fields">
           <article className="panel field-panel">
             <PanelHeading eyebrow="Digital twin · WeatherAPI → Decision Engine" title={`Mô phỏng vận hành 2D · ${dashboard.location.name}`} action={<span className="simulation-live"><i /> Mô phỏng trực tiếp</span>} />
-            <div className={`field-map scene-variant-${sceneVariant} ${weatherUnsafe ? "scene-weather-alert" : ""}`}>
+            <div className={`field-map scene-variant-${sceneVariant} scene-${sceneWeather.type}`}>
               <div className="scene-field field-a"><i /><i /><i /><i /><i /></div>
               <div className="scene-field field-b"><i /><i /><i /><i /></div>
               <div className="scene-field field-c"><i /><i /><i /><i /><i /></div>
@@ -436,9 +437,15 @@ function App() {
                 <b>Trạm UAV</b>
                 <small>Dock 01</small>
               </div>
-              <div className="scene-weather"><CloudRain size={14} /><span>Mưa {operationTile.rain_probability}%</span><Wind size={14} /><span>{operationTile.wind_speed} km/h</span></div>
+              <div className={`scene-weather weather-${sceneWeather.type}`}>
+                {sceneWeather.type === "rain" ? <CloudRain size={14} /> : sceneWeather.type === "wind" ? <Wind size={14} /> : sceneWeather.type === "heat" ? <ThermometerSun size={14} /> : <Check size={14} />}
+                <span>{sceneWeather.label}</span>
+                <Wind size={14} /><span>{operationTile.wind_speed} km/h</span>
+              </div>
               <div className={`scene-status-banner ${sceneStatus.tone}`}><Clock3 size={14} /><span><b>{sceneStatus.title}</b><small>{sceneStatus.detail}</small></span></div>
-              {weatherUnsafe && <div className="weather-layer">{Array.from({ length: 11 }, (_, index) => <i style={{ left: `${index * 10 - 5}%`, animationDelay: `${index * -.17}s` }} key={index} />)}</div>}
+              {sceneWeather.type === "rain" && <div className="weather-layer rain-layer">{Array.from({ length: 13 }, (_, index) => <i style={{ left: `${index * 8 - 4}%`, animationDelay: `${index * -.17}s` }} key={index} />)}</div>}
+              {sceneWeather.type === "wind" && <div className="weather-layer wind-layer">{Array.from({ length: 8 }, (_, index) => <i style={{ top: `${index * 12 + 5}%`, animationDelay: `${index * -.2}s` }} key={index} />)}</div>}
+              {sceneWeather.type === "heat" && <div className="weather-layer heat-layer"><span /><span /><span /></div>}
               {isAirborne && <div className="flight-path" />}
               {isSpraying && <div className="spray-trail">{Array.from({ length: 8 }, (_, index) => <i style={{ left: `${index * 12}%`, animationDelay: `${index * -.12}s` }} key={index} />)}</div>}
               <motion.button
@@ -775,6 +782,29 @@ function getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sp
   if (droneState === "FLYING") return { tone: "safe", title: "UAV đang bay giám sát", detail: "Chọn một mốc giờ xấu để mô phỏng thay đổi thời tiết" };
   if (nextSafeSlot) return { tone: "safe", title: `Sắp tới giờ bay · ${nextSafeSlot.time}`, detail: countdown };
   return { tone: "warning", title: "UAV đang chờ tại trạm", detail: "Chưa có slot TAKE_OFF an toàn trong forecast" };
+}
+
+function getSceneWeather(slot) {
+  if (!slot) return { type: "clear", label: "Điều kiện ổn định" };
+
+  const rainProbability = Number(slot.rain_probability) || 0;
+  const precipitation = Number(slot.precipitation) || 0;
+  const windSpeed = Number(slot.wind_speed) || 0;
+  const windGust = Number(slot.wind_gust) || 0;
+  const temperature = Number(slot.temperature) || 0;
+  const description = `${slot.weather_description ?? ""}`.toLowerCase();
+  const isRainyDescription = /rain|drizzle|thunder|storm|mưa|giông|dông/.test(description);
+
+  if (precipitation > 0 || rainProbability >= 65 || isRainyDescription) {
+    return { type: "rain", label: precipitation > 0 ? `Mưa ${precipitation} mm` : `Nguy cơ mưa ${rainProbability}%` };
+  }
+  if (windSpeed > 20 || windGust > 28 || slot.decision_action === "LOCK_SPRAY") {
+    return { type: "wind", label: "Gió mạnh" };
+  }
+  if (temperature > 35) {
+    return { type: "heat", label: `Nắng nóng ${temperature}°C` };
+  }
+  return { type: "clear", label: `Ổn định ${temperature}°C` };
 }
 
 function buildDashboardAnalytics(dashboard) {
