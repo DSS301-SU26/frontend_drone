@@ -215,10 +215,15 @@ function App() {
     : pipelineRun
       ? `Pipeline mới: ${getFilename(pipelineRun.clean_path)}`
       : "Pipeline sẵn sàng chạy lại";
+  const notificationItems = useMemo(
+    () => buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt }),
+    [dashboard, pipelineRun, syncing, lastSyncedAt],
+  );
+  const notificationAlertCount = notificationItems.filter((item) => item.tone === "danger" || item.tone === "warning").length;
   const recentActivity = useMemo(() => {
     if (!dashboard || !current) return [];
     return [
-      { time: current.time, title: action.title, detail: `${dashboard.location.name}: ${current.weather_description || current.decision_action}`, tone: action.tone === "healthy" ? "success" : "warning" },
+      { time: current.time, title: action.title, detail: `${dashboard.location.name}: ${translateWeatherDescription(current.weather_description)}`, tone: action.tone === "healthy" ? "success" : "warning" },
       { time: current.time, title: "Decision Engine đã tính flow-rate", detail: `Mức đề xuất: ${current.dynamic_flow_rate_pct}% theo điều kiện hiện tại`, tone: "success" },
       { time: slots[0]?.time ?? "--:--", title: "Đã tìm khung giờ vận hành phù hợp", detail: slots[0] ? `${slots[0].time} - ${slots[0].end_time}, điểm bay ${slots[0].flyability_score}/100` : "Chưa có slot phù hợp", tone: "success" },
     ];
@@ -242,6 +247,15 @@ function App() {
     setOperationTimestamp(tile.timestamp);
     if (isAirborne && tile.decision_action !== "TAKE_OFF") {
       notify(`Cảnh báo: thời tiết lúc ${tile.time} chuyển xấu khi UAV đang hoạt động.`);
+    }
+  };
+
+  const selectForecastTime = (slot) => {
+    setOperationTimestamp(slot.timestamp);
+    const recommendedIndex = slots.findIndex((recommendedSlot) => recommendedSlot.timestamp === slot.timestamp);
+    if (recommendedIndex >= 0) setSelectedSlot(recommendedIndex);
+    if (isAirborne && slot.decision_action !== "TAKE_OFF") {
+      notify(`Cảnh báo: thời tiết lúc ${slot.time} chuyển xấu khi UAV đang hoạt động.`);
     }
   };
 
@@ -289,11 +303,16 @@ function App() {
     return <LoadingScreen />;
   }
 
+  const visibilityText = formatVisibility(current.visibility);
+  const weatherDescription = translateWeatherDescription(current.weather_description);
+  const precipitationText = current.precipitation > 0
+    ? `Lượng mưa ${formatNumber(current.precipitation)} mm`
+    : "Chưa ghi nhận mưa";
   const weatherMetrics = [
-    { label: "Nhiệt độ", value: current.temperature, unit: "°C", icon: ThermometerSun, tone: "orange", note: `Ngưỡng an toàn ≤ 35°C` },
-    { label: "Tốc độ gió", value: current.wind_speed, unit: " km/h", icon: Wind, tone: "blue", note: `Gió giật ${current.wind_gust} km/h` },
-    { label: "Độ ẩm", value: current.humidity, unit: "%", icon: Droplets, tone: "cyan", note: "Dữ liệu WeatherAPI" },
-    { label: "Khả năng mưa", value: current.rain_probability, unit: "%", icon: CloudRain, tone: "purple", note: `${current.precipitation} mm lượng mưa` },
+    { label: "Nhiệt độ", value: current.temperature, unit: "°C", icon: ThermometerSun, tone: "orange", note: weatherDescription },
+    { label: "Tốc độ gió", value: current.wind_speed, unit: " km/h", icon: Wind, tone: "blue", note: `Gió giật ${formatNumber(current.wind_gust)} km/h` },
+    { label: "Độ ẩm", value: current.humidity, unit: "%", icon: Droplets, tone: "cyan", note: `Mây ${formatNumber(current.cloud_cover)}% · Tầm nhìn ${visibilityText}` },
+    { label: "Khả năng mưa", value: current.rain_probability, unit: "%", icon: CloudRain, tone: "purple", note: precipitationText },
   ];
 
   return (
@@ -331,13 +350,29 @@ function App() {
           <div className="topbar-actions">
             <label className="search-box"><Search size={17} /><input placeholder="Tìm điểm giám sát..." /></label>
             <div className="notification-wrap">
-              <button className="icon-btn notification-btn" onClick={() => setNotificationOpen(!notificationOpen)}><Bell size={18} /><i /></button>
+              <button className="icon-btn notification-btn" onClick={() => setNotificationOpen(!notificationOpen)} aria-label={`Mở ${notificationItems.length} thông báo dữ liệu thật`}>
+                <Bell size={18} />
+                {notificationAlertCount > 0 && <i>{notificationAlertCount > 9 ? "9+" : notificationAlertCount}</i>}
+              </button>
               <AnimatePresence>
                 {notificationOpen && (
                   <motion.div className="notification-popover" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <b>Cảnh báo Decision Engine</b>
-                    <p><ShieldAlert size={15} /> {action.title} tại {dashboard.location.name}.</p>
-                    <p><CloudRain size={15} /> Khả năng mưa hiện tại: {current.rain_probability}%.</p>
+                    <div className="notification-head">
+                      <b>Thông báo dữ liệu thật</b>
+                      <span>{dashboard.location.name}</span>
+                    </div>
+                    <div className="notification-list">
+                      {notificationItems.map(({ id, icon: Icon, title, detail, time, tone }) => (
+                        <div className={`notification-item ${tone}`} key={id}>
+                          <span className="notification-icon"><Icon size={14} /></span>
+                          <div>
+                            <strong>{title}</strong>
+                            <small>{detail}</small>
+                            {time && <em>{time}</em>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -389,7 +424,7 @@ function App() {
           {weatherMetrics.map(({ label, value, unit, icon: Icon, tone, note }, index) => (
             <motion.article className="metric-card" key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}>
               <div className={`metric-icon ${tone}`}><Icon size={18} /></div>
-              <div className="metric-heading"><span>{label}</span><small className={current.risk_level === "LOW" ? "stable" : ""}>{current.risk_level}</small></div>
+              <div className="metric-heading"><span>{label}</span><small className={current.risk_level === "LOW" ? "stable" : ""}>{translateRiskLevel(current.risk_level)}</small></div>
               <strong>{value}<em>{unit}</em></strong><p>{note}</p>
             </motion.article>
           ))}
@@ -398,7 +433,7 @@ function App() {
         <section className="content-grid">
           <article className="panel weather-panel">
             <PanelHeading eyebrow="WeatherAPI forecast" title={`Xu hướng vi khí hậu · ${dashboard.location.name}`} action={<span className="source-pill">{current.time}</span>} />
-            <WeatherChart forecast={dashboard.forecast} />
+            <WeatherChart forecast={dashboard.forecast} selectedTimestamp={operationTimestamp} onSelect={selectForecastTime} />
           </article>
           <article className="panel slots-panel" id="missions">
             <PanelHeading eyebrow="Rule-based scheduling" title={dashboard.has_safe_slot ? "Khung giờ TAKE_OFF phù hợp" : "Chưa có slot TAKE_OFF an toàn"} action={<Sparkles size={18} className="sparkle" />} />
@@ -524,7 +559,17 @@ function App() {
       </main>
 
       <AnimatePresence>
-        {missionOpen && canSchedule && <MissionModal slot={selectedRecommendedSlot} location={dashboard.location} onClose={() => setMissionOpen(false)} onConfirm={() => { setMissionOpen(false); notify("Đã tạo lịch vận hành UAV từ slot Decision Engine đề xuất."); }} />}
+        {missionOpen && canSchedule && (
+          <MissionModal
+            slot={selectedRecommendedSlot}
+            slots={slots}
+            selectedSlot={selectedSlot}
+            onSelectSlot={(index) => setSelectedSlot(index)}
+            location={dashboard.location}
+            onClose={() => setMissionOpen(false)}
+            onConfirm={() => { setMissionOpen(false); notify(`Đã tạo lịch vận hành UAV lúc ${selectedRecommendedSlot.time}.`); }}
+          />
+        )}
       </AnimatePresence>
       <AnimatePresence>{toast && <motion.div className="toast" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}><Check size={16} />{toast}</motion.div>}</AnimatePresence>
     </div>
@@ -755,6 +800,107 @@ function getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sp
   return { tone: "warning", title: "UAV đang chờ tại trạm", detail: "Chưa có slot TAKE_OFF an toàn trong forecast" };
 }
 
+function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt }) {
+  if (!dashboard?.current) return [];
+
+  const current = dashboard.current;
+  const forecast = dashboard.forecast ?? [];
+  const recommendedSlots = dashboard.recommended_slots ?? [];
+  const action = actionConfig[current.decision_action] ?? actionConfig.DELAY_FLIGHT;
+  const notifications = [
+    {
+      id: `decision-${current.timestamp}`,
+      icon: current.decision_action === "TAKE_OFF" ? Check : ShieldAlert,
+      tone: current.decision_action === "TAKE_OFF" ? "success" : "warning",
+      title: action.title,
+      detail: `${dashboard.location.name}: điểm bay ${formatNumber(current.flyability_score)}/100, rủi ro ${translateRiskLevel(current.risk_level).toLowerCase()}.`,
+      time: current.time,
+    },
+  ];
+
+  if (current.wind_speed > 20 || current.wind_gust > 28 || current.decision_action === "LOCK_SPRAY") {
+    notifications.push({
+      id: `wind-${current.timestamp}`,
+      icon: Wind,
+      tone: "danger",
+      title: "Gió vượt ngưỡng vận hành",
+      detail: `Gió ${formatNumber(current.wind_speed)} km/h, gió giật ${formatNumber(current.wind_gust)} km/h. Ngưỡng an toàn: 20/28 km/h.`,
+      time: current.time,
+    });
+  }
+
+  if (current.precipitation > 0 || current.rain_probability > 30 || current.decision_action === "RETURN_TO_CHARGING") {
+    notifications.push({
+      id: `rain-${current.timestamp}`,
+      icon: CloudRain,
+      tone: current.precipitation > 0 || current.rain_probability > 60 ? "danger" : "warning",
+      title: "Rủi ro mưa trong forecast",
+      detail: `Xác suất mưa ${formatNumber(current.rain_probability)}%, lượng mưa ${formatNumber(current.precipitation)} mm.`,
+      time: current.time,
+    });
+  }
+
+  if (current.temperature > 35) {
+    notifications.push({
+      id: `temp-${current.timestamp}`,
+      icon: ThermometerSun,
+      tone: "warning",
+      title: "Nhiệt độ cao",
+      detail: `Nhiệt độ hiện tại ${formatNumber(current.temperature)}°C, vượt ngưỡng khuyến nghị 35°C.`,
+      time: current.time,
+    });
+  }
+
+  const riskySlots = forecast.filter((slot) => slot.decision_action !== "TAKE_OFF");
+  if (riskySlots.length > 0) {
+    const firstRiskySlot = riskySlots[0];
+    notifications.push({
+      id: `risk-window-${firstRiskySlot.timestamp}`,
+      icon: CircleAlert,
+      tone: riskySlots.length >= Math.ceil(forecast.length / 2) ? "danger" : "warning",
+      title: `${riskySlots.length}/${forecast.length} mốc không an toàn`,
+      detail: `Mốc đầu tiên: ${firstRiskySlot.time} - ${actionConfig[firstRiskySlot.decision_action]?.short ?? firstRiskySlot.decision_action}.`,
+      time: firstRiskySlot.time,
+    });
+  }
+
+  const safeSlot = recommendedSlots.find((slot) => slot.schedule_eligible);
+  notifications.push({
+    id: safeSlot ? `safe-${safeSlot.timestamp}` : "safe-missing",
+    icon: safeSlot ? CalendarDays : Lock,
+    tone: safeSlot ? "success" : "danger",
+    title: safeSlot ? "Có slot TAKE_OFF đề xuất" : "Chưa có slot TAKE_OFF",
+    detail: safeSlot
+      ? `${safeSlot.time} - ${safeSlot.end_time}, điểm bay ${formatNumber(safeSlot.flyability_score)}/100.`
+      : "Decision Engine chưa tìm thấy khung giờ đủ an toàn trong dữ liệu hiện tại.",
+    time: safeSlot?.time ?? current.time,
+  });
+
+  notifications.push({
+    id: syncing ? "pipeline-running" : `source-${dashboard.source.updated_at}`,
+    icon: syncing ? RefreshCw : Radio,
+    tone: syncing ? "info" : "success",
+    title: syncing ? "Pipeline đang đồng bộ" : "Nguồn dữ liệu đã sẵn sàng",
+    detail: syncing
+      ? "Backend đang fetch, clean và upload forecast mới."
+      : `${dashboard.source.dataset} · cập nhật ${formatDateTime(dashboard.source.updated_at)}.`,
+    time: lastSyncedAt ? `FE: ${formatDateTime(lastSyncedAt)}` : "",
+  });
+
+  if (pipelineRun?.clean_path) {
+    notifications.push({
+      id: `pipeline-${pipelineRun.clean_path}`,
+      icon: Check,
+      tone: "success",
+      title: "Pipeline gần nhất hoàn tất",
+      detail: `File clean mới: ${getFilename(pipelineRun.clean_path)}.`,
+      time: "",
+    });
+  }
+
+  return notifications.slice(0, 7);
+}
+
 function getSceneWeather(slot) {
   if (!slot) return { type: "clear", label: "Điều kiện ổn định" };
 
@@ -884,6 +1030,54 @@ function formatNumber(value) {
   return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1);
 }
 
+function formatVisibility(value) {
+  const meters = Number(value) || 0;
+  if (meters >= 1000) return `${formatNumber(meters / 1000)} km`;
+  return `${formatNumber(meters)} m`;
+}
+
+function translateRiskLevel(level) {
+  const labels = {
+    LOW: "Thấp",
+    MEDIUM: "Trung bình",
+    HIGH: "Cao",
+  };
+  return labels[level] ?? level ?? "--";
+}
+
+function translateWeatherDescription(description) {
+  if (!description) return "Điều kiện ổn định";
+  const key = description.trim().toLowerCase();
+  const labels = {
+    sunny: "Nắng",
+    clear: "Trời quang",
+    "partly cloudy": "Có mây rải rác",
+    cloudy: "Nhiều mây",
+    overcast: "Âm u",
+    mist: "Sương mù nhẹ",
+    fog: "Sương mù",
+    "patchy rain nearby": "Có mưa rải rác gần khu vực",
+    "patchy light drizzle": "Mưa phùn nhẹ rải rác",
+    "light drizzle": "Mưa phùn nhẹ",
+    "patchy light rain": "Mưa nhỏ rải rác",
+    "light rain": "Mưa nhỏ",
+    "moderate rain": "Mưa vừa",
+    "heavy rain": "Mưa lớn",
+    "moderate or heavy rain shower": "Mưa rào vừa hoặc lớn",
+    "light rain shower": "Mưa rào nhẹ",
+    "torrential rain shower": "Mưa rào rất lớn",
+    "patchy thunderstorm nearby": "Có dông rải rác gần khu vực",
+    "thundery outbreaks nearby": "Có dông gần khu vực",
+  };
+  if (labels[key]) return labels[key];
+  if (key.includes("thunder")) return "Có dông";
+  if (key.includes("rain")) return "Có mưa";
+  if (key.includes("drizzle")) return "Có mưa phùn";
+  if (key.includes("cloud")) return "Có mây";
+  if (key.includes("fog") || key.includes("mist")) return "Có sương mù";
+  return description;
+}
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -905,23 +1099,68 @@ function getTooltipLeft(index, count) {
   return clamp((index / (count - 1)) * 100, 8, 92);
 }
 
-function WeatherChart({ forecast }) {
+function WeatherChart({ forecast = [], selectedTimestamp, onSelect }) {
+  const [previewIndex, setPreviewIndex] = useState(null);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  if (!forecast.length) {
+    return <div className="empty-chart">Chưa có dữ liệu forecast để vẽ xu hướng khí hậu.</div>;
+  }
   const temperatures = forecast.map((slot) => slot.temperature);
   const min = Math.floor(Math.min(...temperatures) - 1);
   const max = Math.ceil(Math.max(...temperatures) + 1);
   const range = Math.max(max - min, 1);
   const width = 550;
-  const points = forecast.map((slot, index) => `${index * (width / Math.max(forecast.length - 1, 1))},${115 - ((slot.temperature - min) / range) * 92}`).join(" ");
+  const step = width / Math.max(forecast.length - 1, 1);
+  const points = forecast.map((slot, index) => `${index * step},${115 - ((slot.temperature - min) / range) * 92}`).join(" ");
+  const selectedIndex = forecast.findIndex((slot) => slot.timestamp === selectedTimestamp);
+  const activeIndex = previewIndex ?? (selectedIndex >= 0 ? selectedIndex : null);
+  const activeSlot = activeIndex === null ? null : forecast[activeIndex];
+  const previewSlot = previewIndex === null ? null : forecast[previewIndex];
+  const previewX = previewIndex === null ? 0 : previewIndex * step;
+  const previewY = previewSlot ? 115 - ((previewSlot.temperature - min) / range) * 92 : 0;
+  const handlePointerMove = (event) => {
+    setPreviewIndex(getPointerIndex(event, forecast.length));
+  };
+  const selectIndex = (index) => {
+    const slot = forecast[index];
+    if (slot) onSelect?.(slot);
+  };
+
   return (
     <div className="chart-wrap">
       <div className="chart-labels"><span>{max}°</span><span>{Math.round((max + min) / 2)}°</span><span>{min}°</span></div>
-      <svg className="weather-chart" viewBox="0 0 550 140" preserveAspectRatio="none">
-        <defs><linearGradient id="chartArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e69952" stopOpacity=".28" /><stop offset="100%" stopColor="#e69952" stopOpacity="0" /></linearGradient></defs>
-        {[20, 52, 84, 116].map((y) => <line x1="0" x2="550" y1={y} y2={y} key={y} />)}
-        <polygon points={`${points} 550,122 0,122`} fill="url(#chartArea)" /><polyline points={points} fill="none" stroke="#db7c34" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-        {forecast.map((slot, index) => <circle cx={index * (width / Math.max(forecast.length - 1, 1))} cy={115 - ((slot.temperature - min) / range) * 92} r="4" key={slot.timestamp} />)}
-      </svg>
-      <div className="chart-times">{forecast.map((slot) => <span key={slot.timestamp}>{slot.time}</span>)}</div>
+      <div
+        className={`weather-plot interactive-chart ${isScrubbing ? "scrubbing" : ""}`}
+        onPointerDown={(event) => { setIsScrubbing(true); handlePointerMove(event); }}
+        onPointerMove={handlePointerMove}
+        onPointerUp={(event) => { const nextIndex = getPointerIndex(event, forecast.length); setPreviewIndex(nextIndex); selectIndex(nextIndex); setIsScrubbing(false); }}
+        onPointerCancel={() => { setPreviewIndex(null); setIsScrubbing(false); }}
+        onPointerLeave={() => { setPreviewIndex(null); setIsScrubbing(false); }}
+      >
+        <svg className="weather-chart" viewBox="0 0 550 140" preserveAspectRatio="none">
+          <defs><linearGradient id="chartArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#e69952" stopOpacity=".28" /><stop offset="100%" stopColor="#e69952" stopOpacity="0" /></linearGradient></defs>
+          {[20, 52, 84, 116].map((y) => <line x1="0" x2="550" y1={y} y2={y} key={y} />)}
+          {previewSlot && <line className="line-guide" x1={previewX} x2={previewX} y1="16" y2="124" />}
+          <polygon points={`${points} 550,122 0,122`} fill="url(#chartArea)" /><polyline points={points} fill="none" stroke="#db7c34" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          {forecast.map((slot, index) => <circle className={activeIndex === index ? "active" : ""} cx={index * step} cy={115 - ((slot.temperature - min) / range) * 92} r={activeIndex === index ? "6" : "4"} key={slot.timestamp} />)}
+          {previewSlot && <circle className="line-pulse" cx={previewX} cy={previewY} r="10" />}
+        </svg>
+      </div>
+      <div className="chart-times">
+        {forecast.map((slot, index) => (
+          <button className={activeIndex === index ? "active" : ""} onClick={() => selectIndex(index)} key={slot.timestamp}>
+            {slot.time}
+          </button>
+        ))}
+      </div>
+      {activeSlot && (
+        <div className="weather-readout">
+          <b>{activeSlot.time}</b>
+          <span>{formatNumber(activeSlot.temperature)}°C</span>
+          <span><Wind size={12} /> Gió {formatNumber(activeSlot.wind_speed)} km/h</span>
+          <span><CloudRain size={12} /> Mưa {formatNumber(activeSlot.rain_probability)}%</span>
+        </div>
+      )}
       <div className="chart-summary"><span><i className="temp-line" /> Nhiệt độ</span><span><Wind size={13} /> Gió mạnh nhất <b>{Math.max(...forecast.map((slot) => slot.wind_speed))} km/h</b></span><span><CloudRain size={13} /> Mưa cao nhất <b>{Math.max(...forecast.map((slot) => slot.rain_probability))}%</b></span></div>
     </div>
   );
@@ -931,18 +1170,27 @@ function MiniBars({ tone }) {
   return <div className={`mini-bars ${tone}`}>{[28, 42, 36, 53, 48, 66, 58, 72, 76, 90].map((height, index) => <i style={{ height: `${height}%` }} key={index} />)}</div>;
 }
 
-function MissionModal({ slot, location, onClose, onConfirm }) {
+function MissionModal({ slot, slots, selectedSlot, onSelectSlot, location, onClose, onConfirm }) {
   return (
     <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <motion.div className="mission-modal" initial={{ opacity: 0, scale: .96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .96, y: 12 }}>
         <button className="modal-close" onClick={onClose}><X size={18} /></button><span className="modal-eyebrow"><Plane size={14} /> Nhiệm vụ mới</span><h2>Lập lịch vận hành UAV</h2><p>Khung giờ được điền từ kết quả tính toán của Agricultural Drone Scheduler.</p>
         <div className="mission-fields">
           <label><span>Điểm giám sát</span><b><MapPin size={15} /> {location.name}</b></label>
-          <label><span>Khung giờ cất cánh</span><b><CalendarDays size={15} /> {slot.time} - {slot.end_time}</b></label>
+          <label>
+            <span>Khung giờ cất cánh</span>
+            <select className="mission-slot-select" value={selectedSlot} onChange={(event) => onSelectSlot(Number(event.target.value))}>
+              {slots.map((candidate, index) => (
+                <option value={index} disabled={!candidate.schedule_eligible} key={candidate.timestamp}>
+                  {candidate.time} - {candidate.end_time} · {formatNumber(candidate.flyability_score)}/100
+                </option>
+              ))}
+            </select>
+          </label>
           <label><span>Loại nhiệm vụ</span><select><option>Tưới chính xác</option><option>Phun bảo vệ thực vật</option><option>Trinh sát hình ảnh</option></select></label>
           <label><span>Dynamic flow-rate</span><b><Grid2X2 size={15} /> {slot.dynamic_flow_rate_pct}%</b></label>
         </div>
-        <div className="mission-note"><CircleAlert size={16} /><span>Điểm bay {slot.flyability_score}/100. Hệ thống cần kiểm tra lại forecast trước khi cất cánh.</span></div>
+        <div className="mission-note"><CircleAlert size={16} /><span>Đang chọn {slot.time} - {slot.end_time}, điểm bay {slot.flyability_score}/100. Hệ thống cần kiểm tra lại forecast trước khi cất cánh.</span></div>
         <div className="modal-actions"><button className="outline-btn" onClick={onClose}>Hủy bỏ</button><button className="primary-btn" onClick={onConfirm}><Check size={16} /> Xác nhận lịch bay</button></div>
       </motion.div>
     </motion.div>
