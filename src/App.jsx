@@ -59,8 +59,8 @@ const navItems = [
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard },
   { id: "fields", label: "Điều kiện theo giờ", icon: Map },
   { id: "missions", label: "Lịch vận hành", icon: CalendarDays },
-  { id: "rules", label: "Cấu hình rule", icon: SlidersHorizontal },
-  { id: "ai-training", label: "AI Training", icon: Bot },
+  { id: "rules", label: "Cấu hình quy tắc", icon: SlidersHorizontal },
+  { id: "ai-training", label: "Huấn luyện AI", icon: Bot },
   { id: "analytics", label: "Phân tích & KPI", icon: Activity },
   { id: "history", label: "Nhật ký quyết định", icon: History },
 ];
@@ -171,15 +171,15 @@ function App() {
     setSyncing(true);
     setError("");
     try {
-      if (showToast) notify("Backend đang chạy lại pipeline: fetch → clean → upload. Vui lòng chờ...");
+      if (showToast) notify("Hệ thống đang lấy, làm sạch và cập nhật dữ liệu thời tiết mới. Vui lòng chờ...");
       const pipelinePayload = await runPipeline({ days: 3 });
       setPipelineRun(pipelinePayload);
       window.localStorage.setItem(DAILY_SYNC_KEY, getLocalDateKey());
       await loadDashboard(false);
-      if (showToast) notify(`Pipeline đã chạy xong. File mới: ${getFilename(pipelinePayload.clean_path)}.`);
+      if (showToast) notify("Dữ liệu mới đã sẵn sàng để tính khuyến nghị.");
     } catch (requestError) {
       setError(requestError.message);
-      notify(`Chạy pipeline thất bại: ${requestError.message}`);
+      notify(`Cập nhật dữ liệu thất bại: ${requestError.message}`);
     } finally {
       setSyncing(false);
     }
@@ -190,7 +190,7 @@ function App() {
     try {
       const status = await getAiTrainingStatus(locationId);
       setAiTraining(status);
-      if (showToast) notify(`Đã làm mới AI Training Lab cho ${locationId}.`);
+      if (showToast) notify(`Đã làm mới phần huấn luyện AI cho ${locationId}.`);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -208,7 +208,7 @@ function App() {
       notify(successMessage);
     } catch (requestError) {
       setError(requestError.message);
-      notify(`AI pipeline thất bại: ${requestError.message}`);
+      notify(`Bước huấn luyện AI thất bại: ${requestError.message}`);
     } finally {
       setAiTrainingBusyStep("");
     }
@@ -293,10 +293,10 @@ function App() {
   const sceneWeather = getSceneWeather(operationTile);
   const sceneStatus = getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sprayLocked });
   const pipelineStatus = syncing
-    ? "Backend đang chạy pipeline..."
+    ? "Đang cập nhật dữ liệu thời tiết..."
     : pipelineRun
-      ? `Pipeline mới: ${getFilename(pipelineRun.clean_path)}`
-      : "Pipeline sẵn sàng chạy lại";
+      ? "Dữ liệu mới đã sẵn sàng"
+      : "Sẵn sàng cập nhật lại";
   const notificationItems = useMemo(
     () => buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt }),
     [dashboard, pipelineRun, syncing, lastSyncedAt],
@@ -306,8 +306,8 @@ function App() {
     if (!dashboard || !current) return [];
     return [
       { time: current.time, title: action.title, detail: `${dashboard.location.name}: ${translateWeatherDescription(current.weather_description)}`, tone: action.tone === "healthy" ? "success" : "warning" },
-      { time: current.time, title: "Decision Engine đã tính flow-rate", detail: `Mức đề xuất: ${current.dynamic_flow_rate_pct}% theo điều kiện hiện tại`, tone: "success" },
-      { time: slots[0]?.time ?? "--:--", title: "Đã tìm khung giờ vận hành phù hợp", detail: slots[0] ? `${slots[0].time} - ${slots[0].end_time}, điểm bay ${slots[0].flyability_score}/100` : "Chưa có slot phù hợp", tone: "success" },
+      { time: current.time, title: "Đã tính mức phun đề xuất", detail: `Mức đề xuất: ${current.dynamic_flow_rate_pct}% theo điều kiện hiện tại`, tone: "success" },
+      { time: slots[0]?.time ?? "--:--", title: "Đã tìm khung giờ vận hành phù hợp", detail: slots[0] ? `${slots[0].time} - ${slots[0].end_time}, điểm bay ${slots[0].flyability_score}/100` : "Chưa có khung giờ phù hợp", tone: "success" },
     ];
   }, [action, current, dashboard, slots]);
 
@@ -319,7 +319,7 @@ function App() {
 
   const openMission = () => {
     if (!canSchedule) {
-      notify("Chưa có slot TAKE_OFF an toàn. Decision Engine đã khóa thao tác lên lịch.");
+      notify("Chưa có khung giờ cất cánh an toàn. Hệ thống đã khóa thao tác lên lịch.");
       return;
     }
     setMissionOpen(true);
@@ -348,7 +348,7 @@ function App() {
     }
     setSprayLocked(false);
     setDroneState("FLYING");
-    notify(`UAV-01 đã cất cánh theo forecast lúc ${operationTile.time}.`);
+    notify(`UAV-01 đã cất cánh theo dự báo lúc ${operationTile.time}.`);
   };
 
   const toggleSpraying = () => {
@@ -362,7 +362,7 @@ function App() {
       return;
     }
     setDroneState("SPRAYING");
-    notify("Đã bật phun thuốc theo dynamic flow-rate của Decision Engine.");
+    notify("Đã bật phun thuốc theo mức phun hệ thống đề xuất.");
   };
 
   const lockSpray = () => {
@@ -397,10 +397,10 @@ function App() {
       setDecisionConfig(updatedConfig);
       setRuleForm(updatedConfig.thresholds ?? {});
       await loadDashboard(false);
-      notify("Đã lưu cấu hình rule và tính lại dashboard.");
+      notify("Đã lưu cấu hình quy tắc và tính lại khuyến nghị.");
     } catch (requestError) {
       setError(requestError.message);
-      notify(`Lưu rule thất bại: ${requestError.message}`);
+      notify(`Lưu quy tắc thất bại: ${requestError.message}`);
     } finally {
       setSavingRules(false);
     }
@@ -414,10 +414,10 @@ function App() {
       setDecisionConfig(defaultConfig);
       setRuleForm(defaultConfig.thresholds ?? {});
       await loadDashboard(false);
-      notify("Đã đưa rule về mặc định backend.");
+      notify("Đã đưa quy tắc về cấu hình mặc định.");
     } catch (requestError) {
       setError(requestError.message);
-      notify(`Reset rule thất bại: ${requestError.message}`);
+      notify(`Đưa quy tắc về mặc định thất bại: ${requestError.message}`);
     } finally {
       setSavingRules(false);
     }
@@ -443,7 +443,7 @@ function App() {
     { label: "Khả năng mưa", value: current.rain_probability, unit: "%", icon: CloudRain, tone: "purple", note: precipitationText },
   ];
   const activeDecisionConfig = decisionConfig ?? dashboard.decision_config;
-  const ruleSourceLabel = activeDecisionConfig?.source === "file" ? "FE cấu hình" : "Mặc định backend";
+  const ruleSourceLabel = activeDecisionConfig?.source === "file" ? "Đang dùng cấu hình giao diện" : "Đang dùng cấu hình mặc định";
   const unsafeWeatherCodeCount = activeDecisionConfig?.unsafe_weather_codes?.length ?? 0;
 
   return (
@@ -455,7 +455,7 @@ function App() {
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="brand">
           <div className="brand-symbol"><Plane size={19} /></div>
-          <div><b>AgriFlight</b><span>Decision Support</span></div>
+          <div><b>AgriFlight</b><span>Hỗ trợ vận hành</span></div>
         </div>
         <div className="sidebar-label">Không gian làm việc</div>
         <nav className="side-nav">
@@ -466,18 +466,18 @@ function App() {
         <div className="sidebar-bottom">
           <div className="support-card">
             <div className="support-icon"><Bot size={17} /></div>
-            <b>Decision Engine</b>
-            <p>Khuyến nghị được tính từ forecast sạch và rule an toàn UAV.</p>
+            <b>Bộ khuyến nghị</b>
+            <p>Khuyến nghị được tính từ dự báo thời tiết mới nhất và các ngưỡng an toàn UAV.</p>
             <button onClick={() => scrollTo("assistant")}>Xem giải thích <ChevronRight size={14} /></button>
           </div>
-          <button className="profile"><span className="avatar">HN</span><span><b>Hoàng Nam</b><small>Agri Service Manager</small></span><ChevronDown size={15} /></button>
+          <button className="profile"><span className="avatar">HN</span><span><b>Hoàng Nam</b><small>Quản lý dịch vụ nông nghiệp</small></span><ChevronDown size={15} /></button>
         </div>
       </aside>
 
       <main className="main-content">
         <header className="topbar">
           <button className="icon-btn menu-btn" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
-          <div><h1>Trung tâm điều hành</h1><p>Agricultural Drone Scheduler <span className="live-dot" /> <b>Dữ liệu pipeline trực tiếp</b></p></div>
+          <div><h1>Trung tâm điều hành</h1><p>Agricultural Drone Scheduler <span className="live-dot" /> <b>Dữ liệu đang cập nhật trực tiếp</b></p></div>
           <div className="topbar-actions">
             <label className="search-box"><Search size={17} /><input placeholder="Tìm điểm giám sát..." /></label>
             <div className="notification-wrap">
@@ -524,10 +524,10 @@ function App() {
             </label>
           </div>
           <div className="toolbar-right">
-            <span>Nguồn: {dashboard.source.dataset}</span>
+            <span>Nguồn dữ liệu: {dashboard.source.dataset}</span>
             <span>Cập nhật: {formatDateTime(dashboard.source.updated_at)}</span>
             <span>{pipelineStatus}</span>
-            <button className="outline-btn" disabled={syncing} onClick={() => executePipelineRefresh(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> {syncing ? "Đang chạy pipeline" : "Chạy lại dữ liệu"}</button>
+            <button className="outline-btn" disabled={syncing} onClick={() => executePipelineRefresh(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> {syncing ? "Đang cập nhật" : "Chạy lại dữ liệu"}</button>
           </div>
         </section>
 
@@ -536,7 +536,7 @@ function App() {
         <section className="decision-hero" id="overview">
           <div className="hero-glow glow-one" /><div className="hero-glow glow-two" />
           <div className="hero-copy">
-            <span className="eyebrow"><span className="pulse-ring"><ShieldAlert size={14} /></span> {current.decision_action} · Decision Engine</span>
+            <span className="eyebrow"><span className="pulse-ring"><ShieldAlert size={14} /></span> {formatDecisionLabel(current.decision_action)} · Bộ khuyến nghị</span>
             <h2>{action.title}</h2>
             <p>{action.description}</p>
             <div className="hero-actions">
@@ -563,17 +563,17 @@ function App() {
 
         <section className="panel rule-config-panel" id="rules">
           <PanelHeading
-            eyebrow="Dynamic rule config"
-            title="Cấu hình ngưỡng quyết định từ FrontEnd"
+            eyebrow="Ngưỡng an toàn có thể chỉnh"
+            title="Cấu hình quy tắc vận hành từ giao diện"
             action={<span className="source-pill">{ruleSourceLabel}</span>}
           />
           <div className="rule-config-body">
             <div className="rule-config-copy">
-              <span><SlidersHorizontal size={15} /> Rule engine đang dùng config động</span>
-              <p>Thay đổi các ngưỡng bên dưới rồi lưu để backend tính lại action, điểm bay và slot đề xuất từ forecast hiện tại.</p>
+              <span><SlidersHorizontal size={15} /> Bộ quy tắc đang nhận cấu hình từ giao diện</span>
+              <p>Thay đổi các ngưỡng bên dưới rồi lưu để hệ thống tính lại khuyến nghị, điểm bay và khung giờ đề xuất từ dự báo hiện tại.</p>
               <div className="rule-config-meta">
                 <b>{unsafeWeatherCodeCount}</b><small>mã thời tiết nguy hiểm</small>
-                <b>{formatDateTime(activeDecisionConfig?.updated_at) || "--"}</b><small>lần cập nhật config</small>
+                <b>{formatDateTime(activeDecisionConfig?.updated_at) || "--"}</b><small>lần cập nhật cấu hình</small>
               </div>
             </div>
             <div className="rule-form-grid">
@@ -608,18 +608,18 @@ function App() {
           busyStep={aiTrainingBusyStep}
           refreshing={aiTrainingRefreshing}
           onRefresh={() => loadAiTraining(true)}
-          onSimulateImages={() => runAiTrainingStep("simulate", simulateAiTrainingImages, "Đã map ảnh thời tiết với forecast.")}
-          onExtractFeatures={() => runAiTrainingStep("extract", extractAiTrainingFeatures, "Đã trích xuất MobileNetV2 image embeddings.")}
-          onTrainModel={() => runAiTrainingStep("train", trainAiModel, "Đã train lại AI model và cập nhật metrics.")}
+          onSimulateImages={() => runAiTrainingStep("simulate", simulateAiTrainingImages, "Đã ghép lại ảnh theo dữ liệu thời tiết.")}
+          onExtractFeatures={() => runAiTrainingStep("extract", extractAiTrainingFeatures, "Đã đọc lại đặc điểm ảnh để phục vụ huấn luyện.")}
+          onTrainModel={() => runAiTrainingStep("train", trainAiModel, "Đã học lại mô hình và cập nhật kết quả so sánh.")}
         />
 
         <section className="content-grid">
           <article className="panel weather-panel">
-            <PanelHeading eyebrow="WeatherAPI forecast" title={`Xu hướng vi khí hậu · ${dashboard.location.name}`} action={<span className="source-pill">{current.time}</span>} />
+            <PanelHeading eyebrow="Dự báo thời tiết" title={`Xu hướng vi khí hậu · ${dashboard.location.name}`} action={<span className="source-pill">{current.time}</span>} />
             <WeatherChart forecast={dashboard.forecast} selectedTimestamp={operationTimestamp} onSelect={selectForecastTime} />
           </article>
           <article className="panel slots-panel" id="missions">
-            <PanelHeading eyebrow="Rule-based scheduling" title={dashboard.has_safe_slot ? "Khung giờ TAKE_OFF phù hợp" : "Chưa có slot TAKE_OFF an toàn"} action={<Sparkles size={18} className="sparkle" />} />
+            <PanelHeading eyebrow="Xếp lịch theo ngưỡng an toàn" title={dashboard.has_safe_slot ? "Khung giờ cất cánh phù hợp" : "Chưa có khung giờ đủ an toàn"} action={<Sparkles size={18} className="sparkle" />} />
             <div className="slot-list">
               {slots.map((slot, index) => (
                 <button className={`time-slot ${selectedSlot === index ? "selected" : ""} ${slot.schedule_eligible ? "" : "unsafe"}`} onClick={() => setSelectedSlot(index)} key={slot.timestamp}>
@@ -636,7 +636,7 @@ function App() {
 
         <section className="content-grid map-row" id="fields">
           <article className="panel field-panel">
-            <PanelHeading eyebrow="Digital twin · WeatherAPI → Decision Engine" title={`Mô phỏng vận hành 3D · ${dashboard.location.name}`} action={<span className="simulation-live"><i /> 3D tương tác</span>} />
+            <PanelHeading eyebrow="Mô phỏng theo dự báo thời tiết" title={`Vận hành 3D · ${dashboard.location.name}`} action={<span className="simulation-live"><i /> 3D tương tác</span>} />
             <Suspense fallback={<div className="field-map three-field-map three-loading">Đang tải mô phỏng 3D...</div>}>
               <DroneScene3D
                 weather={sceneWeather}
@@ -658,7 +658,7 @@ function App() {
                   {droneOpen && (
                     <motion.div className="drone-panel" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 18 }}>
                       <button className="drone-panel-close" aria-label="Đóng trạng thái UAV" onClick={() => setDroneOpen(false)}><X size={15} /></button>
-                      <span className="drone-panel-eyebrow"><Radio size={13} /> UAV-01 · Telemetry trực tiếp</span>
+                      <span className="drone-panel-eyebrow"><Radio size={13} /> UAV-01 · Trạng thái trực tiếp</span>
                       <div className={`operation-alert ${weatherUnsafe ? "danger" : "safe"}`}>
                         {weatherUnsafe ? <CircleAlert size={14} /> : <Check size={14} />}
                         <span><b>{weatherUnsafe ? "Điều kiện vận hành thay đổi" : "Điều kiện vận hành ổn định"}</b><small>Mốc mô phỏng {operationTile.time}: {operationAction.title}</small></span>
@@ -670,7 +670,7 @@ function App() {
                       <div className="drone-stats">
                         <span><Wind size={13} /><b>{operationTile.wind_speed}</b><small>km/h gió</small></span>
                         <span><CloudRain size={13} /><b>{operationTile.rain_probability}%</b><small>khả năng mưa</small></span>
-                        <span><Droplets size={13} /><b>{operationTile.dynamic_flow_rate_pct}%</b><small>flow-rate</small></span>
+                        <span><Droplets size={13} /><b>{operationTile.dynamic_flow_rate_pct}%</b><small>mức phun</small></span>
                       </div>
                       <div className="drone-controls">
                         {droneState === "DOCKED" && <button className="control-primary" disabled={!operationTile.schedule_eligible} onClick={launchDrone}><Play size={13} /> Cất cánh</button>}
@@ -678,7 +678,7 @@ function App() {
                         {canControlFlight && <button className="control-warning" disabled={sprayLocked} onClick={lockSpray}><Lock size={13} /> {sprayLocked ? "Đã khóa phun" : "Khóa phun"}</button>}
                         {canControlFlight && <button className="control-danger" onClick={returnToStation}><House size={13} /> Quay về trạm</button>}
                       </div>
-                      <p className="simulation-hint">Kéo trên bản đồ để xoay góc nhìn, cuộn để zoom. Click UAV trong scene để mở telemetry.</p>
+                      <p className="simulation-hint">Kéo trên bản đồ để xoay góc nhìn, cuộn để phóng to hoặc thu nhỏ. Bấm vào UAV để xem trạng thái.</p>
                       <div className="drone-timeline-heading"><b>Dự báo vận hành trong ngày</b><small><i /> hiện tại · chọn giờ để mô phỏng</small></div>
                       <div className="drone-timeline">
                         {timelineTiles.map((tile) => (
@@ -687,7 +687,7 @@ function App() {
                           </button>
                         ))}
                       </div>
-                      <p className="drone-recommendation">{operationTile.recommendation_text}</p>
+                      <p className="drone-recommendation">{formatRecommendationText(operationTile.recommendation_text)}</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -703,28 +703,28 @@ function App() {
           <article className="panel insight-panel" id="assistant">
             <div className="assistant-heading">
               <div className="assistant-icon"><Bot size={19} /></div>
-              <div><span>AgriFlight Explainability</span><small><i /> Rule engine đang hoạt động</small></div><Sparkles size={17} />
+              <div><span>Giải thích khuyến nghị</span><small><i /> Bộ quy tắc đang hoạt động</small></div><Sparkles size={17} />
             </div>
             <div className="ai-message">
               <span>Khuyến nghị mới nhất</span><h3>{action.title}</h3>
               <p>{action.description} Dữ liệu đầu vào: gió <b>{current.wind_speed} km/h</b>, gió giật <b>{current.wind_gust} km/h</b>, xác suất mưa <b>{current.rain_probability}%</b>.</p>
-              <div className="ai-recommendation"><Zap size={15} /><span>Dynamic flow-rate đề xuất: <b>{current.dynamic_flow_rate_pct}%</b>. {dashboard.has_safe_slot ? <>Slot TAKE_OFF gần nhất: <b>{slots[0]?.time}</b>.</> : <b>Chưa có slot TAKE_OFF an toàn trong forecast.</b>}</span></div>
+              <div className="ai-recommendation"><Zap size={15} /><span>Mức phun đề xuất: <b>{current.dynamic_flow_rate_pct}%</b>. {dashboard.has_safe_slot ? <>Khung giờ cất cánh gần nhất: <b>{slots[0]?.time}</b>.</> : <b>Chưa có khung giờ cất cánh an toàn trong dự báo hiện tại.</b>}</span></div>
             </div>
             <div className="quick-prompts">
-              <button onClick={() => notify(`Action hiện tại: ${current.decision_action}`)}>Xem mã quyết định hiện tại <ChevronRight size={13} /></button>
-              <button onClick={() => notify(`Nguồn dữ liệu: ${dashboard.source.dataset}`)}>Kiểm tra nguồn forecast <ChevronRight size={13} /></button>
+              <button onClick={() => notify(`Khuyến nghị hiện tại: ${formatDecisionLabel(current.decision_action)}`)}>Xem khuyến nghị hiện tại <ChevronRight size={13} /></button>
+              <button onClick={() => notify(`Nguồn dữ liệu: ${dashboard.source.dataset}`)}>Kiểm tra nguồn dự báo <ChevronRight size={13} /></button>
             </div>
-            <div className="engine-output"><b>Engine output</b><span>{current.recommendation_text}</span></div>
+            <div className="engine-output"><b>Kết luận hệ thống</b><span>{formatRecommendationText(current.recommendation_text)}</span></div>
           </article>
         </section>
 
         <section className="kpi-section" id="analytics">
           <div className="section-heading">
-            <div><span>Dữ liệu thật từ BackEnd</span><h2>Số liệu và biểu đồ quyết định mới nhất</h2></div>
+            <div><span>Dữ liệu vận hành mới nhất</span><h2>Số liệu và biểu đồ quyết định mới nhất</h2></div>
             <button className="outline-btn" disabled={syncing} onClick={() => executePipelineRefresh(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> {syncing ? "Đang chạy" : "Chạy lại"}</button>
           </div>
           <RealDataDashboard analytics={analytics} source={dashboard.source} lastSyncedAt={lastSyncedAt} pipelineRun={pipelineRun} />
-          <div className="section-heading kpi-heading"><div><span>Backtesting report</span><h2>KPI mô phỏng của Decision Engine</h2></div><button className="outline-btn" onClick={() => notify("KPI lấy từ reports/backtesting_summary.json")}><Gauge size={15} /> Nguồn báo cáo thật</button></div>
+          <div className="section-heading kpi-heading"><div><span>Báo cáo kiểm chứng</span><h2>KPI mô phỏng của bộ khuyến nghị</h2></div><button className="outline-btn" onClick={() => notify("KPI lấy từ báo cáo kiểm chứng mới nhất.")}><Gauge size={15} /> Xem nguồn số liệu</button></div>
           <div className="kpi-grid">
             {dashboard.kpis.map((kpi) => (
               <article className={`kpi-card ${kpi.tone}`} key={kpi.key}><span>{kpi.label}</span><strong>{kpi.value}{kpi.suffix}</strong><small><Check size={13} /> {kpi.note}</small><MiniBars tone={kpi.tone} /></article>
@@ -734,7 +734,7 @@ function App() {
         </section>
 
         <section className="panel activity-panel" id="history">
-          <PanelHeading eyebrow="Decision audit" title="Hoạt động pipeline gần đây" action={<span className="source-pill">{dashboard.source.dataset}</span>} />
+          <PanelHeading eyebrow="Nhật ký khuyến nghị" title="Hoạt động dữ liệu gần đây" action={<span className="source-pill">{dashboard.source.dataset}</span>} />
           <div className="activity-list">
             {recentActivity.map((item) => <div className="activity-item" key={item.title}><span className={`activity-marker ${item.tone}`} /><time>{item.time}</time><div><b>{item.title}</b><small>{item.detail}</small></div></div>)}
           </div>
@@ -778,22 +778,22 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
     {
       id: "simulate",
       icon: Grid2X2,
-      title: "Map ảnh theo forecast",
-      detail: "Chạy lại mapping ảnh theo forecast sạch rồi trả về dữ liệu của địa điểm đang chọn.",
+      title: "Ghép ảnh theo thời tiết",
+      detail: "Chọn lại bộ ảnh phù hợp với dữ liệu thời tiết của địa điểm đang theo dõi.",
       action: onSimulateImages,
     },
     {
       id: "extract",
       icon: Sparkles,
-      title: "Trích xuất image embeddings",
-      detail: "Đọc lại ảnh bằng MobileNetV2 pretrained, sau đó làm mới status theo địa điểm.",
+      title: "Đọc đặc điểm ảnh",
+      detail: "Phân tích màu sắc, mây, mưa và ánh sáng trong ảnh để làm dữ liệu học.",
       action: onExtractFeatures,
     },
     {
       id: "train",
       icon: Bot,
-      title: "Train lại decision model",
-      detail: "Merge weather + image features, train lại model, rồi hiển thị lại metrics.",
+      title: "Học lại cách ra khuyến nghị",
+      detail: "Kết hợp thời tiết và đặc điểm ảnh để cập nhật cách hệ thống so sánh quyết định.",
       action: onTrainModel,
     },
   ];
@@ -801,21 +801,21 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
   return (
     <section className="panel ai-training-panel" id="ai-training">
       <PanelHeading
-        eyebrow="Image AI pipeline"
-        title={`AI Training Lab · ${location?.name ?? "Đang tải"}`}
+        eyebrow="Ảnh và thời tiết"
+        title={`Khu huấn luyện AI · ${location?.name ?? "Đang tải"}`}
         action={<button className="outline-btn" disabled={running} onClick={onRefresh}><RefreshCw className={running ? "spin" : ""} size={15} /> {refreshing ? "Đang làm mới" : "Làm mới"}</button>}
       />
       <div className="ai-lab-grid">
         <div className="ai-lab-summary">
           <div className="ai-lab-intro">
-            <span><Bot size={16} /> Hybrid DSS model</span>
-            <p>Dữ liệu đang lọc theo địa điểm đã chọn. Backend lấy timestamp forecast của khu vực này, ghép ảnh tương ứng, đọc MobileNetV2 embeddings và đối chiếu với model scikit-learn đã train.</p>
+            <span><Bot size={16} /> Mô hình hỗ trợ quyết định</span>
+            <p>Dữ liệu đang lọc theo địa điểm đã chọn. Hệ thống lấy từng khung giờ dự báo của khu vực này, ghép ảnh thời tiết tương ứng, đọc đặc điểm ảnh và dùng chúng để kiểm tra cách ra khuyến nghị.</p>
           </div>
           <div className="ai-lab-kpis">
             <span><b>{status?.generated_image_count ?? 0}</b><small>ảnh của địa điểm</small></span>
-            <span><b>{status?.image_features?.image_feature_columns ?? 0}</b><small>feature/ảnh</small></span>
-            <span><b>{status?.training_dataset?.rows ?? 0}</b><small>dòng train</small></span>
-            <span><b>{bestModel}</b><small>model tốt nhất</small></span>
+            <span><b>{status?.image_features?.image_feature_columns ?? 0}</b><small>chỉ số/ảnh</small></span>
+            <span><b>{status?.training_dataset?.rows ?? 0}</b><small>mẫu học</small></span>
+            <span><b>{formatModelName(bestModel)}</b><small>cách tính tốt nhất</small></span>
           </div>
           <div className="ai-category-list">
             {categories.length ? categories.map(([name, count]) => (
@@ -837,7 +837,7 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
 
       <div className="ai-lab-lower">
         <div className="ai-model-metrics">
-          <div className="ai-subheading"><span>Model comparison · {status?.location ?? location?.name ?? "--"}</span><b>{metrics.length} thuật toán</b></div>
+          <div className="ai-subheading"><span>So sánh cách dự đoán · {status?.location ?? location?.name ?? "--"}</span><b>{metrics.length} cách tính</b></div>
           {metrics.length ? (
             <>
               {metrics.map((metric) => {
@@ -849,11 +849,11 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
                       <span>{formatModelName(metric.model)}</span>
                       <div><i style={{ width }} /></div>
                       <b>{formatNumber((Number(metric.macro_f1) || 0) * 100)}%</b>
-                      <small>Acc {formatNumber((Number(metric.accuracy) || 0) * 100)}%</small>
+                      <small>Đúng {formatNumber((Number(metric.accuracy) || 0) * 100)}%</small>
                     </div>
                     <p>
-                      Đúng {metric.correct_predictions ?? 0}/{testRows} mẫu test; Precision {formatNumber((Number(metric.macro_precision) || 0) * 100)}%,
-                      Recall {formatNumber((Number(metric.macro_recall) || 0) * 100)}%, Weighted F1 {formatNumber((Number(metric.weighted_f1) || 0) * 100)}%.
+                      Đúng {metric.correct_predictions ?? 0}/{testRows} mẫu kiểm tra; độ chắc của khuyến nghị {formatNumber((Number(metric.macro_precision) || 0) * 100)}%,
+                      độ bao phủ các tình huống {formatNumber((Number(metric.macro_recall) || 0) * 100)}%, điểm theo số lượng mẫu {formatNumber((Number(metric.weighted_f1) || 0) * 100)}%.
                     </p>
                   </div>
                 );
@@ -861,34 +861,34 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
               <div className="ai-metric-explain">
                 <b>Vì sao ra các % này?</b>
                 <p>
-                  Số lớn là Macro F1: backend train model trên dữ liệu của {status?.location ?? location?.name ?? "địa điểm này"},
-                  tách train/test bằng timestamp, rồi lấy trung bình F1 của từng decision_action. Cách này tránh việc nhóm nhiều mẫu làm đẹp điểm giả.
-                  Accuracy bên phải là tỷ lệ dự đoán đúng trên tập test.
+                  Số lớn là điểm cân bằng theo từng loại khuyến nghị: hệ thống học trên dữ liệu của {status?.location ?? location?.name ?? "địa điểm này"},
+                  rồi kiểm tra trên một nhóm khung giờ chưa dùng để học. Điểm này không để nhóm xuất hiện nhiều lấn át nhóm ít xuất hiện.
+                  Tỷ lệ “Đúng” bên phải là số lần hệ thống chọn đúng khuyến nghị trên nhóm kiểm tra.
                 </p>
                 <div className="ai-eval-grid">
-                  <span><b>{evaluation.train_rows ?? summary.train_rows ?? 0}</b><small>dòng train</small></span>
-                  <span><b>{evaluation.test_rows ?? summary.test_rows ?? 0}</b><small>dòng test</small></span>
-                  <span><b>{evaluation.train_timestamps ?? 0}</b><small>timestamp train</small></span>
-                  <span><b>{evaluation.test_timestamps ?? 0}</b><small>timestamp test</small></span>
+                  <span><b>{evaluation.train_rows ?? summary.train_rows ?? 0}</b><small>mẫu học</small></span>
+                  <span><b>{evaluation.test_rows ?? summary.test_rows ?? 0}</b><small>mẫu kiểm tra</small></span>
+                  <span><b>{evaluation.train_timestamps ?? 0}</b><small>khung giờ học</small></span>
+                  <span><b>{evaluation.test_timestamps ?? 0}</b><small>khung giờ kiểm tra</small></span>
                 </div>
                 <div className="ai-class-chips">
                   {testClassDistribution.length ? testClassDistribution.map(([label, count]) => (
-                    <span key={label}>{label}<b>{count}</b></span>
-                  )) : <span>Chưa có phân bố action test</span>}
+                    <span key={label}>{formatDecisionLabel(label)}<b>{count}</b></span>
+                  )) : <span>Chưa có phân bố khuyến nghị kiểm tra</span>}
                 </div>
                 {bestMetric && (
                   <p>
-                    {formatModelName(bestMetric.model)} đứng đầu vì Macro F1 đạt {formatNumber((Number(bestMetric.macro_f1) || 0) * 100)}%,
-                    với {bestMetric.correct_predictions ?? 0}/{bestMetric.test_rows ?? evaluation.test_rows ?? 0} mẫu test được dự đoán đúng.
+                    {formatModelName(bestMetric.model)} đứng đầu vì điểm cân bằng đạt {formatNumber((Number(bestMetric.macro_f1) || 0) * 100)}%,
+                    với {bestMetric.correct_predictions ?? 0}/{bestMetric.test_rows ?? evaluation.test_rows ?? 0} mẫu kiểm tra được dự đoán đúng.
                   </p>
                 )}
               </div>
             </>
-          ) : <div className="empty-chart">Chưa có model_metrics.csv</div>}
+          ) : <div className="empty-chart">Chưa có kết quả đánh giá mô hình.</div>}
         </div>
 
         <div className="ai-image-preview">
-          <div className="ai-subheading"><span>Ảnh đã ghép timestamp · {location?.name ?? "--"}</span><b>{status?.generated_image_samples?.length ?? 0} mẫu</b></div>
+          <div className="ai-subheading"><span>Ảnh đã ghép theo khung giờ · {location?.name ?? "--"}</span><b>{status?.generated_image_samples?.length ?? 0} mẫu</b></div>
           <div className="ai-image-grid">
             {(status?.generated_image_samples ?? []).map((sample) => (
               <figure key={sample.filename}>
@@ -901,12 +901,12 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
       </div>
 
       <div className="ai-lab-footer">
-        <span><MapPin size={13} /> Location: <b>{status?.location ?? location?.name ?? "--"}</b></span>
+        <span><MapPin size={13} /> Địa điểm: <b>{status?.location ?? location?.name ?? "--"}</b></span>
         <span><RefreshCw size={13} /> Cập nhật AI: <b>{formatDateTimeWithSeconds(status?.refreshed_at)}</b></span>
-        <span><Check size={13} /> Split: <b>{summary.strategy ?? "--"}</b></span>
-        <span><Clock3 size={13} /> Train/Test: <b>{summary.train_rows ?? 0}/{summary.test_rows ?? 0}</b></span>
-        <span><Radio size={13} /> Model file: <b>{status?.model?.file?.path ?? "--"}</b></span>
-        {latestRun && <span><Activity size={13} /> Lần chạy mới nhất: <b>{latestRun.step} · {latestRun.duration_seconds}s</b></span>}
+        <span><Check size={13} /> Cách chia dữ liệu: <b>{formatSplitStrategy(evaluation.split_strategy ?? summary.strategy)}</b></span>
+        <span><Clock3 size={13} /> Học/Kiểm tra: <b>{evaluation.train_rows ?? summary.train_rows ?? 0}/{evaluation.test_rows ?? summary.test_rows ?? 0}</b></span>
+        <span><Radio size={13} /> Bản mô hình: <b>{formatDateTime(status?.model?.file?.updated_at) || "chưa có"}</b></span>
+        {latestRun && <span><Activity size={13} /> Lần chạy mới nhất: <b>{formatAiStep(latestRun.step)} · {latestRun.duration_seconds}s</b></span>}
       </div>
     </section>
   );
@@ -934,7 +934,7 @@ function RealDataDashboard({ analytics, source, lastSyncedAt, pipelineRun }) {
           <HorizontalBarChart data={analytics.rows} valueKey="flyability_score" suffix="/100" />
         </motion.article>
         <motion.article className="panel chart-panel interactive-panel" whileHover={{ y: -4 }} whileTap={{ scale: .995 }}>
-          <PanelHeading eyebrow="Biểu đồ đường" title="Nhiệt độ forecast trong ngày" action={<ThermometerSun size={17} className="sparkle" />} />
+          <PanelHeading eyebrow="Biểu đồ đường" title="Nhiệt độ dự báo trong ngày" action={<ThermometerSun size={17} className="sparkle" />} />
           <LineTrendChart data={analytics.rows} valueKey="temperature" suffix="°C" />
         </motion.article>
         <motion.article className="panel chart-panel interactive-panel" whileHover={{ y: -4 }} whileTap={{ scale: .995 }}>
@@ -943,9 +943,9 @@ function RealDataDashboard({ analytics, source, lastSyncedAt, pipelineRun }) {
         </motion.article>
       </div>
       <div className="data-freshness">
-        <span><Radio size={13} /> Reference time: <b>{formatDateTime(source.reference_time)}</b></span>
-        <span><Clock3 size={13} /> FE đồng bộ lần cuối: <b>{formatDateTime(lastSyncedAt)}</b></span>
-        {pipelineRun && <span><Check size={13} /> Pipeline gần nhất: <b>{getFilename(pipelineRun.clean_path)}</b></span>}
+        <span><Radio size={13} /> Mốc đang dùng: <b>{formatDateTime(source.reference_time)}</b></span>
+        <span><Clock3 size={13} /> Giao diện cập nhật lần cuối: <b>{formatDateTime(lastSyncedAt)}</b></span>
+        {pipelineRun && <span><Check size={13} /> Dữ liệu mới nhất: <b>đã cập nhật</b></span>}
         <span><RefreshCw size={13} /> Tự chạy lại 1 lần khi sang ngày mới</span>
       </div>
       {pipelineRun?.steps?.length > 0 && (
@@ -1045,7 +1045,7 @@ function LineTrendChart({ data, valueKey, suffix }) {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const values = data.map((item) => Number(item[valueKey]) || 0);
   if (!values.length) {
-    return <div className="empty-chart">Chưa có dữ liệu forecast để vẽ biểu đồ.</div>;
+    return <div className="empty-chart">Chưa có dữ liệu dự báo để vẽ biểu đồ.</div>;
   }
   const min = Math.floor(Math.min(...values, 0));
   const max = Math.ceil(Math.max(...values, 1));
@@ -1126,10 +1126,10 @@ function getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sp
   if (droneState === "SPRAYING" && weatherUnsafe) return { tone: "danger", title: "Thời tiết xấu khi đang phun", detail: "Khóa vòi phun hoặc đưa UAV về trạm ngay" };
   if (droneState === "FLYING" && weatherUnsafe) return { tone: "danger", title: "Thời tiết thay đổi khi đang bay", detail: "Kiểm tra telemetry và cân nhắc quay về trạm" };
   if (sprayLocked && droneState !== "DOCKED") return { tone: "warning", title: "Vòi phun đã bị khóa", detail: "UAV vẫn bay nhưng không còn phun thuốc" };
-  if (droneState === "SPRAYING") return { tone: "safe", title: "Đang phun theo flow-rate", detail: "Decision Engine đang giám sát điều kiện vận hành" };
+  if (droneState === "SPRAYING") return { tone: "safe", title: "Đang phun theo mức đề xuất", detail: "Hệ thống đang giám sát điều kiện vận hành" };
   if (droneState === "FLYING") return { tone: "safe", title: "UAV đang bay giám sát", detail: "Chọn một mốc giờ xấu để mô phỏng thay đổi thời tiết" };
   if (nextSafeSlot) return { tone: "safe", title: `Sắp tới giờ bay · ${nextSafeSlot.time}`, detail: countdown };
-  return { tone: "warning", title: "UAV đang chờ tại trạm", detail: "Chưa có slot TAKE_OFF an toàn trong forecast" };
+  return { tone: "warning", title: "UAV đang chờ tại trạm", detail: "Chưa có khung giờ cất cánh an toàn trong dự báo" };
 }
 
 function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt }) {
@@ -1166,7 +1166,7 @@ function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt 
       id: `rain-${current.timestamp}`,
       icon: CloudRain,
       tone: current.precipitation > 0 || current.rain_probability > 60 ? "danger" : "warning",
-      title: "Rủi ro mưa trong forecast",
+      title: "Rủi ro mưa trong dự báo",
       detail: `Xác suất mưa ${formatNumber(current.rain_probability)}%, lượng mưa ${formatNumber(current.precipitation)} mm.`,
       time: current.time,
     });
@@ -1201,10 +1201,10 @@ function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt 
     id: safeSlot ? `safe-${safeSlot.timestamp}` : "safe-missing",
     icon: safeSlot ? CalendarDays : Lock,
     tone: safeSlot ? "success" : "danger",
-    title: safeSlot ? "Có slot TAKE_OFF đề xuất" : "Chưa có slot TAKE_OFF",
+    title: safeSlot ? "Có khung giờ cất cánh đề xuất" : "Chưa có khung giờ cất cánh",
     detail: safeSlot
       ? `${safeSlot.time} - ${safeSlot.end_time}, điểm bay ${formatNumber(safeSlot.flyability_score)}/100.`
-      : "Decision Engine chưa tìm thấy khung giờ đủ an toàn trong dữ liệu hiện tại.",
+      : "Hệ thống chưa tìm thấy khung giờ đủ an toàn trong dữ liệu hiện tại.",
     time: safeSlot?.time ?? current.time,
   });
 
@@ -1212,11 +1212,11 @@ function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt 
     id: syncing ? "pipeline-running" : `source-${dashboard.source.updated_at}`,
     icon: syncing ? RefreshCw : Radio,
     tone: syncing ? "info" : "success",
-    title: syncing ? "Pipeline đang đồng bộ" : "Nguồn dữ liệu đã sẵn sàng",
+    title: syncing ? "Đang đồng bộ dữ liệu" : "Nguồn dữ liệu đã sẵn sàng",
     detail: syncing
-      ? "Backend đang fetch, clean và upload forecast mới."
+      ? "Hệ thống đang lấy và làm sạch dự báo mới."
       : `${dashboard.source.dataset} · cập nhật ${formatDateTime(dashboard.source.updated_at)}.`,
-    time: lastSyncedAt ? `FE: ${formatDateTime(lastSyncedAt)}` : "",
+    time: lastSyncedAt ? `Giao diện: ${formatDateTime(lastSyncedAt)}` : "",
   });
 
   if (pipelineRun?.clean_path) {
@@ -1224,8 +1224,8 @@ function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt 
       id: `pipeline-${pipelineRun.clean_path}`,
       icon: Check,
       tone: "success",
-      title: "Pipeline gần nhất hoàn tất",
-      detail: `File clean mới: ${getFilename(pipelineRun.clean_path)}.`,
+      title: "Dữ liệu mới đã cập nhật",
+      detail: "Dự báo đã được làm sạch và đưa vào tính toán.",
       time: "",
     });
   }
@@ -1269,8 +1269,8 @@ function buildDashboardAnalytics(dashboard) {
     rows,
     actionSegments,
     summary: [
-      { label: "Forecast nhận từ BE", value: rows.length, suffix: " mốc", note: dashboard?.source?.dataset ?? "Đang chờ dữ liệu" },
-      { label: "Slot bay an toàn", value: safeSlots, suffix: `/${rows.length}`, note: `${formatNumber((safeSlots / Math.max(rows.length, 1)) * 100)}% khung giờ TAKE_OFF` },
+      { label: "Mốc dự báo nhận được", value: rows.length, suffix: " mốc", note: dashboard?.source?.dataset ?? "Đang chờ dữ liệu" },
+      { label: "Khung giờ bay an toàn", value: safeSlots, suffix: `/${rows.length}`, note: `${formatNumber((safeSlots / Math.max(rows.length, 1)) * 100)}% khung giờ cất cánh` },
       { label: "Điểm bay trung bình", value: formatNumber(average(scores)), suffix: "/100", note: `Cao nhất ${formatNumber(Math.max(...scores, 0))}/100` },
       { label: "Điều kiện nổi bật", value: formatNumber(Math.max(...rains, 0)), suffix: "% mưa", note: `Gió TB ${formatNumber(average(winds))} km/h · Nhiệt TB ${formatNumber(average(temps))}°C` },
     ],
@@ -1351,10 +1351,39 @@ function formatDateTimeWithSeconds(value) {
 
 function formatModelName(value) {
   if (!value) return "--";
+  const labels = {
+    decision_tree: "Cây quyết định",
+    random_forest: "Rừng quyết định",
+    logistic_regression: "Hồi quy xác suất",
+    baseline_majority: "Mốc so sánh đơn giản",
+  };
+  if (labels[value]) return labels[value];
   return value
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatDecisionLabel(value) {
+  return actionConfig[value]?.title ?? value ?? "--";
+}
+
+function formatSplitStrategy(value) {
+  if (!value) return "--";
+  if (`${value}`.includes("GroupShuffleSplit")) return "Chia theo khung giờ để kiểm tra công bằng";
+  return value;
+}
+
+function formatAiStep(step) {
+  const labels = {
+    simulate_images: "Ghép ảnh theo thời tiết",
+    extract_features: "Đọc đặc điểm ảnh",
+    train_model: "Học lại cách ra khuyến nghị",
+    simulate: "Ghép ảnh theo thời tiết",
+    extract: "Đọc đặc điểm ảnh",
+    train: "Học lại cách ra khuyến nghị",
+  };
+  return labels[step] ?? step ?? "--";
 }
 
 function getFilename(path) {
@@ -1364,9 +1393,9 @@ function getFilename(path) {
 
 function formatPipelineStep(step) {
   const labels = {
-    fetch_weather: "Lấy WeatherAPI",
+    fetch_weather: "Lấy dự báo thời tiết",
     clean_data: "Làm sạch dữ liệu",
-    upload_supabase: "Upload Supabase",
+    upload_supabase: "Cập nhật kho dữ liệu",
   };
   const rows = step.rows ? ` · ${step.rows} dòng` : "";
   const warning = step.status === "warning" ? " · cảnh báo" : "";
@@ -1432,6 +1461,25 @@ function translateWeatherDescription(description) {
   return description;
 }
 
+function formatRecommendationText(text) {
+  if (!text) return "--";
+  return `${text}`
+    .replace(/^TAKE_OFF:/, "Có thể cất cánh:")
+    .replace(/^LOCK_SPRAY:/, "Khóa lệnh phun:")
+    .replace(/^RETURN_TO_CHARGING:/, "Đưa UAV về trạm sạc:")
+    .replace(/^DELAY_FLIGHT:/, "Nên hoãn chuyến bay:")
+    .replace("Dieu kien bay chap nhan duoc.", "Điều kiện bay chấp nhận được.")
+    .replace(/Gio ([\d.]+) km\/h, gio giat ([\d.]+) km\/h, xac suat mua ([\d.]+)%\./, "Gió $1 km/h, gió giật $2 km/h, khả năng mưa $3%.")
+    .replace(/De xuat flow-rate ([\d.]+)%\./, "Mức phun đề xuất $1%.")
+    .replace("Khoa lenh phun vi gio/gio giat vuot nguong an toan", "Khóa phun vì gió hoặc gió giật vượt ngưỡng an toàn")
+    .replace("Tranh pesticide drift va mat on dinh UAV.", "Tránh thuốc bị gió cuốn lệch và giữ UAV ổn định.")
+    .replace("Thoi tiet mua/nguy hiem", "Thời tiết có mưa hoặc nguy hiểm")
+    .replace("xac suat mua", "khả năng mưa")
+    .replace("Dua drone ve tram sac de bao ve thiet bi.", "Đưa UAV về trạm sạc để bảo vệ thiết bị.")
+    .replace(/Tam hoan bay do nhiet do ([\d.]+)C hoac rui ro mua ([\d.]+)%\./, "Tạm hoãn bay do nhiệt độ $1°C hoặc rủi ro mưa $2%.")
+    .replace("Kiem tra lai khung gio ke tiep.", "Kiểm tra lại khung giờ kế tiếp.");
+}
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -1457,7 +1505,7 @@ function WeatherChart({ forecast = [], selectedTimestamp, onSelect }) {
   const [previewIndex, setPreviewIndex] = useState(null);
   const [isScrubbing, setIsScrubbing] = useState(false);
   if (!forecast.length) {
-    return <div className="empty-chart">Chưa có dữ liệu forecast để vẽ xu hướng khí hậu.</div>;
+    return <div className="empty-chart">Chưa có dữ liệu dự báo để vẽ xu hướng khí hậu.</div>;
   }
   const temperatures = forecast.map((slot) => slot.temperature);
   const min = Math.floor(Math.min(...temperatures) - 1);
@@ -1528,7 +1576,7 @@ function MissionModal({ slot, slots, selectedSlot, onSelectSlot, location, onClo
   return (
     <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
       <motion.div className="mission-modal" initial={{ opacity: 0, scale: .96, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .96, y: 12 }}>
-        <button className="modal-close" onClick={onClose}><X size={18} /></button><span className="modal-eyebrow"><Plane size={14} /> Nhiệm vụ mới</span><h2>Lập lịch vận hành UAV</h2><p>Khung giờ được điền từ kết quả tính toán của Agricultural Drone Scheduler.</p>
+        <button className="modal-close" onClick={onClose}><X size={18} /></button><span className="modal-eyebrow"><Plane size={14} /> Nhiệm vụ mới</span><h2>Lập lịch vận hành UAV</h2><p>Khung giờ được gợi ý từ dữ liệu thời tiết và các ngưỡng an toàn hiện tại.</p>
         <div className="mission-fields">
           <label><span>Điểm giám sát</span><b><MapPin size={15} /> {location.name}</b></label>
           <label>
@@ -1542,9 +1590,9 @@ function MissionModal({ slot, slots, selectedSlot, onSelectSlot, location, onClo
             </select>
           </label>
           <label><span>Loại nhiệm vụ</span><select><option>Tưới chính xác</option><option>Phun bảo vệ thực vật</option><option>Trinh sát hình ảnh</option></select></label>
-          <label><span>Dynamic flow-rate</span><b><Grid2X2 size={15} /> {slot.dynamic_flow_rate_pct}%</b></label>
+          <label><span>Mức phun đề xuất</span><b><Grid2X2 size={15} /> {slot.dynamic_flow_rate_pct}%</b></label>
         </div>
-        <div className="mission-note"><CircleAlert size={16} /><span>Đang chọn {slot.time} - {slot.end_time}, điểm bay {slot.flyability_score}/100. Hệ thống cần kiểm tra lại forecast trước khi cất cánh.</span></div>
+        <div className="mission-note"><CircleAlert size={16} /><span>Đang chọn {slot.time} - {slot.end_time}, điểm bay {slot.flyability_score}/100. Hệ thống cần kiểm tra lại dự báo trước khi cất cánh.</span></div>
         <div className="modal-actions"><button className="outline-btn" onClick={onClose}>Hủy bỏ</button><button className="primary-btn" onClick={onConfirm}><Check size={16} /> Xác nhận lịch bay</button></div>
       </motion.div>
     </motion.div>
@@ -1552,11 +1600,11 @@ function MissionModal({ slot, slots, selectedSlot, onSelectSlot, location, onClo
 }
 
 function LoadingScreen() {
-  return <div className="loading-screen"><Plane size={24} /><h2>Đang kết nối Agricultural Drone Scheduler</h2><p>Đọc forecast sạch và chạy Decision Engine...</p></div>;
+  return <div className="loading-screen"><Plane size={24} /><h2>Đang kết nối Agricultural Drone Scheduler</h2><p>Đang đọc dữ liệu thời tiết và tính khuyến nghị...</p></div>;
 }
 
 function ErrorScreen({ error, retry }) {
-  return <div className="loading-screen error-screen"><CircleAlert size={26} /><h2>Chưa kết nối được backend</h2><p>{error}</p><button className="primary-btn" onClick={retry}><RefreshCw size={15} /> Thử lại</button></div>;
+  return <div className="loading-screen error-screen"><CircleAlert size={26} /><h2>Chưa kết nối được dịch vụ dữ liệu</h2><p>{error}</p><button className="primary-btn" onClick={retry}><RefreshCw size={15} /> Thử lại</button></div>;
 }
 
 export default App;

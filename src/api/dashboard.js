@@ -4,7 +4,7 @@ async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store", ...options });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    const detail = payload.detail?.message ?? payload.detail ?? "Không thể kết nối Agricultural Drone Scheduler API.";
+    const detail = payload.detail?.message ?? payload.detail ?? "Không thể kết nối dịch vụ dữ liệu Agricultural Drone Scheduler.";
     throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   return response.json();
