@@ -40,7 +40,18 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { getDashboard, getDecisionConfig, getLocations, resetDecisionConfig, runPipeline, updateDecisionConfig } from "./api/dashboard";
+import {
+  extractAiTrainingFeatures,
+  getAiTrainingStatus,
+  getDashboard,
+  getDecisionConfig,
+  getLocations,
+  resetDecisionConfig,
+  runPipeline,
+  simulateAiTrainingImages,
+  trainAiModel,
+  updateDecisionConfig,
+} from "./api/dashboard";
 
 const DroneScene3D = lazy(() => import("./components/DroneScene3D"));
 
@@ -49,6 +60,7 @@ const navItems = [
   { id: "fields", label: "Điều kiện theo giờ", icon: Map },
   { id: "missions", label: "Lịch vận hành", icon: CalendarDays },
   { id: "rules", label: "Cấu hình rule", icon: SlidersHorizontal },
+  { id: "ai-training", label: "AI Training", icon: Bot },
   { id: "analytics", label: "Phân tích & KPI", icon: Activity },
   { id: "history", label: "Nhật ký quyết định", icon: History },
 ];
@@ -124,6 +136,10 @@ function App() {
   const [pipelineRun, setPipelineRun] = useState(null);
   const [decisionConfig, setDecisionConfig] = useState(null);
   const [ruleForm, setRuleForm] = useState({});
+  const [aiTraining, setAiTraining] = useState(null);
+  const [aiTrainingRun, setAiTrainingRun] = useState(null);
+  const [aiTrainingBusyStep, setAiTrainingBusyStep] = useState("");
+  const [aiTrainingRefreshing, setAiTrainingRefreshing] = useState(false);
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -169,6 +185,35 @@ function App() {
     }
   }, [loadDashboard, notify]);
 
+  const loadAiTraining = useCallback(async (showToast = false) => {
+    setAiTrainingRefreshing(true);
+    try {
+      const status = await getAiTrainingStatus(locationId);
+      setAiTraining(status);
+      if (showToast) notify(`Đã làm mới AI Training Lab cho ${locationId}.`);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setAiTrainingRefreshing(false);
+    }
+  }, [locationId, notify]);
+
+  const runAiTrainingStep = useCallback(async (step, runner, successMessage) => {
+    setAiTrainingBusyStep(step);
+    setError("");
+    try {
+      const payload = await runner(locationId);
+      setAiTrainingRun(payload);
+      setAiTraining(payload.ai_training);
+      notify(successMessage);
+    } catch (requestError) {
+      setError(requestError.message);
+      notify(`AI pipeline thất bại: ${requestError.message}`);
+    } finally {
+      setAiTrainingBusyStep("");
+    }
+  }, [locationId, notify]);
+
   useEffect(() => {
     getLocations().then(setLocations).catch((requestError) => setError(requestError.message));
     getDecisionConfig()
@@ -180,8 +225,16 @@ function App() {
   }, []);
 
   useEffect(() => {
+    loadAiTraining();
+  }, [loadAiTraining]);
+
+  useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (dashboard?.source?.updated_at) loadAiTraining();
+  }, [dashboard?.source?.updated_at, loadAiTraining]);
 
   useEffect(() => {
     if (!dashboard?.decision_config?.thresholds) return;
@@ -548,6 +601,18 @@ function App() {
           </div>
         </section>
 
+        <AiTrainingLab
+          status={aiTraining}
+          location={dashboard.location}
+          latestRun={aiTrainingRun}
+          busyStep={aiTrainingBusyStep}
+          refreshing={aiTrainingRefreshing}
+          onRefresh={() => loadAiTraining(true)}
+          onSimulateImages={() => runAiTrainingStep("simulate", simulateAiTrainingImages, "Đã map ảnh thời tiết với forecast.")}
+          onExtractFeatures={() => runAiTrainingStep("extract", extractAiTrainingFeatures, "Đã trích xuất MobileNetV2 image embeddings.")}
+          onTrainModel={() => runAiTrainingStep("train", trainAiModel, "Đã train lại AI model và cập nhật metrics.")}
+        />
+
         <section className="content-grid">
           <article className="panel weather-panel">
             <PanelHeading eyebrow="WeatherAPI forecast" title={`Xu hướng vi khí hậu · ${dashboard.location.name}`} action={<span className="source-pill">{current.time}</span>} />
@@ -696,6 +761,155 @@ function App() {
 
 function PanelHeading({ eyebrow, title, action }) {
   return <div className="panel-heading"><div><span>{eyebrow}</span><h2>{title}</h2></div>{action}</div>;
+}
+
+function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRefresh, onSimulateImages, onExtractFeatures, onTrainModel }) {
+  const categories = Object.entries(status?.image_categories ?? {});
+  const metrics = status?.metrics ?? [];
+  const bestModel = status?.model?.best_model ?? "--";
+  const maxMacroF1 = Math.max(...metrics.map((metric) => Number(metric.macro_f1) || 0), 1);
+  const summary = status?.training_summary ?? {};
+  const evaluation = status?.model_evaluation ?? {};
+  const bestMetric = metrics[0];
+  const testClassDistribution = Object.entries(evaluation.test_class_distribution ?? {})
+    .sort((left, right) => Number(right[1]) - Number(left[1]));
+  const running = Boolean(busyStep) || refreshing;
+  const actionSteps = [
+    {
+      id: "simulate",
+      icon: Grid2X2,
+      title: "Map ảnh theo forecast",
+      detail: "Chạy lại mapping ảnh theo forecast sạch rồi trả về dữ liệu của địa điểm đang chọn.",
+      action: onSimulateImages,
+    },
+    {
+      id: "extract",
+      icon: Sparkles,
+      title: "Trích xuất image embeddings",
+      detail: "Đọc lại ảnh bằng MobileNetV2 pretrained, sau đó làm mới status theo địa điểm.",
+      action: onExtractFeatures,
+    },
+    {
+      id: "train",
+      icon: Bot,
+      title: "Train lại decision model",
+      detail: "Merge weather + image features, train lại model, rồi hiển thị lại metrics.",
+      action: onTrainModel,
+    },
+  ];
+
+  return (
+    <section className="panel ai-training-panel" id="ai-training">
+      <PanelHeading
+        eyebrow="Image AI pipeline"
+        title={`AI Training Lab · ${location?.name ?? "Đang tải"}`}
+        action={<button className="outline-btn" disabled={running} onClick={onRefresh}><RefreshCw className={running ? "spin" : ""} size={15} /> {refreshing ? "Đang làm mới" : "Làm mới"}</button>}
+      />
+      <div className="ai-lab-grid">
+        <div className="ai-lab-summary">
+          <div className="ai-lab-intro">
+            <span><Bot size={16} /> Hybrid DSS model</span>
+            <p>Dữ liệu đang lọc theo địa điểm đã chọn. Backend lấy timestamp forecast của khu vực này, ghép ảnh tương ứng, đọc MobileNetV2 embeddings và đối chiếu với model scikit-learn đã train.</p>
+          </div>
+          <div className="ai-lab-kpis">
+            <span><b>{status?.generated_image_count ?? 0}</b><small>ảnh của địa điểm</small></span>
+            <span><b>{status?.image_features?.image_feature_columns ?? 0}</b><small>feature/ảnh</small></span>
+            <span><b>{status?.training_dataset?.rows ?? 0}</b><small>dòng train</small></span>
+            <span><b>{bestModel}</b><small>model tốt nhất</small></span>
+          </div>
+          <div className="ai-category-list">
+            {categories.length ? categories.map(([name, count]) => (
+              <span key={name}><i />{name}<b>{count}</b></span>
+            )) : <small>Chưa đọc được thư mục ảnh nguồn.</small>}
+          </div>
+        </div>
+
+        <div className="ai-step-list">
+          {actionSteps.map(({ id, icon: Icon, title, detail, action }) => (
+            <button className={`ai-step ${busyStep === id ? "running" : ""}`} disabled={running} onClick={action} key={id}>
+              <span><Icon size={16} /></span>
+              <b>{busyStep === id ? "Đang chạy..." : title}</b>
+              <small>{detail}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="ai-lab-lower">
+        <div className="ai-model-metrics">
+          <div className="ai-subheading"><span>Model comparison · {status?.location ?? location?.name ?? "--"}</span><b>{metrics.length} thuật toán</b></div>
+          {metrics.length ? (
+            <>
+              {metrics.map((metric) => {
+                const width = `${Math.max((Number(metric.macro_f1) || 0) / maxMacroF1 * 100, 4)}%`;
+                const testRows = Number(metric.test_rows) || Number(evaluation.test_rows) || 0;
+                return (
+                  <div className="ai-model-stack" key={metric.model}>
+                    <div className={`ai-model-row ${metric.model === bestModel ? "best" : ""}`}>
+                      <span>{formatModelName(metric.model)}</span>
+                      <div><i style={{ width }} /></div>
+                      <b>{formatNumber((Number(metric.macro_f1) || 0) * 100)}%</b>
+                      <small>Acc {formatNumber((Number(metric.accuracy) || 0) * 100)}%</small>
+                    </div>
+                    <p>
+                      Đúng {metric.correct_predictions ?? 0}/{testRows} mẫu test; Precision {formatNumber((Number(metric.macro_precision) || 0) * 100)}%,
+                      Recall {formatNumber((Number(metric.macro_recall) || 0) * 100)}%, Weighted F1 {formatNumber((Number(metric.weighted_f1) || 0) * 100)}%.
+                    </p>
+                  </div>
+                );
+              })}
+              <div className="ai-metric-explain">
+                <b>Vì sao ra các % này?</b>
+                <p>
+                  Số lớn là Macro F1: backend train model trên dữ liệu của {status?.location ?? location?.name ?? "địa điểm này"},
+                  tách train/test bằng timestamp, rồi lấy trung bình F1 của từng decision_action. Cách này tránh việc nhóm nhiều mẫu làm đẹp điểm giả.
+                  Accuracy bên phải là tỷ lệ dự đoán đúng trên tập test.
+                </p>
+                <div className="ai-eval-grid">
+                  <span><b>{evaluation.train_rows ?? summary.train_rows ?? 0}</b><small>dòng train</small></span>
+                  <span><b>{evaluation.test_rows ?? summary.test_rows ?? 0}</b><small>dòng test</small></span>
+                  <span><b>{evaluation.train_timestamps ?? 0}</b><small>timestamp train</small></span>
+                  <span><b>{evaluation.test_timestamps ?? 0}</b><small>timestamp test</small></span>
+                </div>
+                <div className="ai-class-chips">
+                  {testClassDistribution.length ? testClassDistribution.map(([label, count]) => (
+                    <span key={label}>{label}<b>{count}</b></span>
+                  )) : <span>Chưa có phân bố action test</span>}
+                </div>
+                {bestMetric && (
+                  <p>
+                    {formatModelName(bestMetric.model)} đứng đầu vì Macro F1 đạt {formatNumber((Number(bestMetric.macro_f1) || 0) * 100)}%,
+                    với {bestMetric.correct_predictions ?? 0}/{bestMetric.test_rows ?? evaluation.test_rows ?? 0} mẫu test được dự đoán đúng.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : <div className="empty-chart">Chưa có model_metrics.csv</div>}
+        </div>
+
+        <div className="ai-image-preview">
+          <div className="ai-subheading"><span>Ảnh đã ghép timestamp · {location?.name ?? "--"}</span><b>{status?.generated_image_samples?.length ?? 0} mẫu</b></div>
+          <div className="ai-image-grid">
+            {(status?.generated_image_samples ?? []).map((sample) => (
+              <figure key={sample.filename}>
+                <img src={sample.url} alt={sample.timestamp} />
+                <figcaption>{sample.timestamp}<small>{sample.category ?? ""}</small></figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="ai-lab-footer">
+        <span><MapPin size={13} /> Location: <b>{status?.location ?? location?.name ?? "--"}</b></span>
+        <span><RefreshCw size={13} /> Cập nhật AI: <b>{formatDateTimeWithSeconds(status?.refreshed_at)}</b></span>
+        <span><Check size={13} /> Split: <b>{summary.strategy ?? "--"}</b></span>
+        <span><Clock3 size={13} /> Train/Test: <b>{summary.train_rows ?? 0}/{summary.test_rows ?? 0}</b></span>
+        <span><Radio size={13} /> Model file: <b>{status?.model?.file?.path ?? "--"}</b></span>
+        {latestRun && <span><Activity size={13} /> Lần chạy mới nhất: <b>{latestRun.step} · {latestRun.duration_seconds}s</b></span>}
+      </div>
+    </section>
+  );
 }
 
 function RealDataDashboard({ analytics, source, lastSyncedAt, pipelineRun }) {
@@ -1119,6 +1333,28 @@ function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDateTimeWithSeconds(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function formatModelName(value) {
+  if (!value) return "--";
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function getFilename(path) {

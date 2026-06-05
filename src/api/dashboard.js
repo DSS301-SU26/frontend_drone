@@ -38,6 +38,32 @@ export function resetDecisionConfig() {
   return request("/api/decision-config/reset", { method: "POST" });
 }
 
+function locationParams(location) {
+  const params = new URLSearchParams({ refresh: Date.now().toString() });
+  if (location) params.set("location", location);
+  return params.toString();
+}
+
+export function getAiTrainingStatus(location) {
+  return request(`/api/ai-training/status?${locationParams(location)}`);
+}
+
+export function getAiTrainingMetrics() {
+  return request("/api/ai-training/metrics");
+}
+
+export function simulateAiTrainingImages(location) {
+  return request(`/api/ai-training/simulate-images?${locationParams(location)}`, { method: "POST" });
+}
+
+export function extractAiTrainingFeatures(location) {
+  return request(`/api/ai-training/extract-features?${locationParams(location)}`, { method: "POST" });
+}
+
+export function trainAiModel(location) {
+  return request(`/api/ai-training/train?${locationParams(location)}`, { method: "POST" });
+}
+
 export function runPipeline({ days = 3, skipUpload = false } = {}) {
   const params = new URLSearchParams({
     days: days.toString(),
