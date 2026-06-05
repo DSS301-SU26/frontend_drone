@@ -22,6 +22,22 @@ export function getDashboard(location) {
   return request(`/api/dashboard?${params.toString()}`);
 }
 
+export function getDecisionConfig() {
+  return request("/api/decision-config");
+}
+
+export function updateDecisionConfig(config) {
+  return request("/api/decision-config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+}
+
+export function resetDecisionConfig() {
+  return request("/api/decision-config/reset", { method: "POST" });
+}
+
 export function runPipeline({ days = 3, skipUpload = false } = {}) {
   const params = new URLSearchParams({
     days: days.toString(),

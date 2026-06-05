@@ -27,9 +27,12 @@ import {
   Plus,
   Radio,
   RefreshCw,
+  RotateCcw,
   Route,
+  Save,
   Search,
   ShieldAlert,
+  SlidersHorizontal,
   Sparkles,
   ThermometerSun,
   TrendingDown,
@@ -37,7 +40,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { getDashboard, getLocations, runPipeline } from "./api/dashboard";
+import { getDashboard, getDecisionConfig, getLocations, resetDecisionConfig, runPipeline, updateDecisionConfig } from "./api/dashboard";
 
 const DroneScene3D = lazy(() => import("./components/DroneScene3D"));
 
@@ -45,6 +48,7 @@ const navItems = [
   { id: "overview", label: "Tổng quan", icon: LayoutDashboard },
   { id: "fields", label: "Điều kiện theo giờ", icon: Map },
   { id: "missions", label: "Lịch vận hành", icon: CalendarDays },
+  { id: "rules", label: "Cấu hình rule", icon: SlidersHorizontal },
   { id: "analytics", label: "Phân tích & KPI", icon: Activity },
   { id: "history", label: "Nhật ký quyết định", icon: History },
 ];
@@ -89,6 +93,16 @@ const droneStateConfig = {
 
 const DAILY_SYNC_KEY = "agriflight:last-daily-sync";
 
+const ruleFields = [
+  { key: "max_wind_speed", label: "Gió tối đa", unit: "km/h", min: 1, max: 80, step: 0.5, icon: Wind },
+  { key: "max_wind_gust", label: "Gió giật tối đa", unit: "km/h", min: 1, max: 120, step: 0.5, icon: Wind },
+  { key: "max_rain_probability", label: "Ngưỡng hoãn bay", unit: "% mưa", min: 0, max: 100, step: 1, icon: CloudRain },
+  { key: "return_to_charging_rain_probability", label: "Ngưỡng về trạm", unit: "% mưa", min: 0, max: 100, step: 1, icon: House },
+  { key: "max_safe_temperature", label: "Nhiệt độ tối đa", unit: "°C", min: 0, max: 60, step: 0.5, icon: ThermometerSun },
+  { key: "max_cloud_cover", label: "Mây tối đa", unit: "%", min: 0, max: 100, step: 1, icon: CloudRain },
+  { key: "min_visibility", label: "Tầm nhìn tối thiểu", unit: "m", min: 0, max: 50000, step: 100, icon: Navigation },
+];
+
 function App() {
   const [locations, setLocations] = useState([]);
   const [locationId, setLocationId] = useState("Dong Thap");
@@ -105,8 +119,11 @@ function App() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [savingRules, setSavingRules] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState("");
   const [pipelineRun, setPipelineRun] = useState(null);
+  const [decisionConfig, setDecisionConfig] = useState(null);
+  const [ruleForm, setRuleForm] = useState({});
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -154,11 +171,23 @@ function App() {
 
   useEffect(() => {
     getLocations().then(setLocations).catch((requestError) => setError(requestError.message));
+    getDecisionConfig()
+      .then((config) => {
+        setDecisionConfig(config);
+        setRuleForm(config.thresholds ?? {});
+      })
+      .catch((requestError) => setError(requestError.message));
   }, []);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (!dashboard?.decision_config?.thresholds) return;
+    setDecisionConfig(dashboard.decision_config);
+    setRuleForm(dashboard.decision_config.thresholds);
+  }, [dashboard?.decision_config]);
 
   useEffect(() => {
     let midnightTimeout;
@@ -295,6 +324,52 @@ function App() {
     notify("UAV-01 đang quay về trạm Dock 01.");
   };
 
+  const updateRuleField = (key, value) => {
+    setRuleForm((currentForm) => ({ ...currentForm, [key]: value }));
+  };
+
+  const buildRulePayload = () => ({
+    thresholds: ruleFields.reduce((payload, field) => {
+      payload[field.key] = Number(ruleForm[field.key]);
+      return payload;
+    }, {}),
+    unsafe_weather_codes: decisionConfig?.unsafe_weather_codes ?? [],
+  });
+
+  const saveDecisionRules = async () => {
+    setSavingRules(true);
+    setError("");
+    try {
+      const updatedConfig = await updateDecisionConfig(buildRulePayload());
+      setDecisionConfig(updatedConfig);
+      setRuleForm(updatedConfig.thresholds ?? {});
+      await loadDashboard(false);
+      notify("Đã lưu cấu hình rule và tính lại dashboard.");
+    } catch (requestError) {
+      setError(requestError.message);
+      notify(`Lưu rule thất bại: ${requestError.message}`);
+    } finally {
+      setSavingRules(false);
+    }
+  };
+
+  const resetDecisionRules = async () => {
+    setSavingRules(true);
+    setError("");
+    try {
+      const defaultConfig = await resetDecisionConfig();
+      setDecisionConfig(defaultConfig);
+      setRuleForm(defaultConfig.thresholds ?? {});
+      await loadDashboard(false);
+      notify("Đã đưa rule về mặc định backend.");
+    } catch (requestError) {
+      setError(requestError.message);
+      notify(`Reset rule thất bại: ${requestError.message}`);
+    } finally {
+      setSavingRules(false);
+    }
+  };
+
   if (!dashboard && error) {
     return <ErrorScreen error={error} retry={() => loadDashboard()} />;
   }
@@ -314,6 +389,9 @@ function App() {
     { label: "Độ ẩm", value: current.humidity, unit: "%", icon: Droplets, tone: "cyan", note: `Mây ${formatNumber(current.cloud_cover)}% · Tầm nhìn ${visibilityText}` },
     { label: "Khả năng mưa", value: current.rain_probability, unit: "%", icon: CloudRain, tone: "purple", note: precipitationText },
   ];
+  const activeDecisionConfig = decisionConfig ?? dashboard.decision_config;
+  const ruleSourceLabel = activeDecisionConfig?.source === "file" ? "FE cấu hình" : "Mặc định backend";
+  const unsafeWeatherCodeCount = activeDecisionConfig?.unsafe_weather_codes?.length ?? 0;
 
   return (
     <div className="app-shell">
@@ -428,6 +506,46 @@ function App() {
               <strong>{value}<em>{unit}</em></strong><p>{note}</p>
             </motion.article>
           ))}
+        </section>
+
+        <section className="panel rule-config-panel" id="rules">
+          <PanelHeading
+            eyebrow="Dynamic rule config"
+            title="Cấu hình ngưỡng quyết định từ FrontEnd"
+            action={<span className="source-pill">{ruleSourceLabel}</span>}
+          />
+          <div className="rule-config-body">
+            <div className="rule-config-copy">
+              <span><SlidersHorizontal size={15} /> Rule engine đang dùng config động</span>
+              <p>Thay đổi các ngưỡng bên dưới rồi lưu để backend tính lại action, điểm bay và slot đề xuất từ forecast hiện tại.</p>
+              <div className="rule-config-meta">
+                <b>{unsafeWeatherCodeCount}</b><small>mã thời tiết nguy hiểm</small>
+                <b>{formatDateTime(activeDecisionConfig?.updated_at) || "--"}</b><small>lần cập nhật config</small>
+              </div>
+            </div>
+            <div className="rule-form-grid">
+              {ruleFields.map(({ key, label, unit, min, max, step, icon: Icon }) => (
+                <label className="rule-input" key={key}>
+                  <span><Icon size={13} />{label}</span>
+                  <div>
+                    <input
+                      type="number"
+                      min={min}
+                      max={max}
+                      step={step}
+                      value={ruleForm[key] ?? ""}
+                      onChange={(event) => updateRuleField(key, event.target.value)}
+                    />
+                    <em>{unit}</em>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="rule-config-actions">
+            <button className="outline-btn" disabled={savingRules} onClick={resetDecisionRules}><RotateCcw size={15} /> Về mặc định</button>
+            <button className="primary-btn" disabled={savingRules} onClick={saveDecisionRules}><Save size={15} /> {savingRules ? "Đang lưu" : "Lưu và tính lại"}</button>
+          </div>
         </section>
 
         <section className="content-grid">
