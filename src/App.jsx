@@ -840,6 +840,7 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
           <div className="ai-subheading"><span>So sánh cách dự đoán · {status?.location ?? location?.name ?? "--"}</span><b>{metrics.length} cách tính</b></div>
           {metrics.length ? (
             <>
+              <AiModelComparisonCharts metrics={metrics} bestModel={bestModel} />
               {metrics.map((metric) => {
                 const width = `${Math.max((Number(metric.macro_f1) || 0) / maxMacroF1 * 100, 4)}%`;
                 const testRows = Number(metric.test_rows) || Number(evaluation.test_rows) || 0;
@@ -909,6 +910,112 @@ function AiTrainingLab({ status, location, latestRun, busyStep, refreshing, onRe
         {latestRun && <span><Activity size={13} /> Lần chạy mới nhất: <b>{formatAiStep(latestRun.step)} · {latestRun.duration_seconds}s</b></span>}
       </div>
     </section>
+  );
+}
+
+function AiModelComparisonCharts({ metrics, bestModel }) {
+  const baseline = metrics.find((metric) => metric.model === "baseline_majority") ?? metrics.at(-1) ?? {};
+  const baselineMacroF1 = Number(baseline.macro_f1) || 0;
+  const sortedByF1 = [...metrics].sort((left, right) => (Number(right.macro_f1) || 0) - (Number(left.macro_f1) || 0));
+  const bestMetric = sortedByF1[0];
+  const bestLift = ((Number(bestMetric?.macro_f1) || 0) - baselineMacroF1) * 100;
+
+  return (
+    <div className="ai-model-chart-grid">
+      <ModelGroupedBarChart
+        title="F1 và độ đúng"
+        note="Macro F1 ưu tiên cân bằng giữa các loại quyết định"
+        metrics={metrics}
+        series={[
+          { key: "macro_f1", label: "Macro F1", color: "#65a875" },
+          { key: "accuracy", label: "Accuracy", color: "#4f8ca9" },
+        ]}
+        bestModel={bestModel}
+      />
+      <ModelGroupedBarChart
+        title="Precision và Recall"
+        note="Đo độ chắc và độ bao phủ tình huống"
+        metrics={metrics}
+        series={[
+          { key: "macro_precision", label: "Precision", color: "#dca04c" },
+          { key: "macro_recall", label: "Recall", color: "#8aa6cf" },
+        ]}
+        bestModel={bestModel}
+      />
+      <ModelLiftChart
+        title="Cải thiện so với baseline"
+        note={`${formatModelName(bestMetric?.model)} đang cao hơn baseline ${formatNumber(bestLift)} điểm F1`}
+        metrics={sortedByF1}
+        baselineMacroF1={baselineMacroF1}
+        bestModel={bestModel}
+      />
+    </div>
+  );
+}
+
+function ModelGroupedBarChart({ title, note, metrics, series, bestModel }) {
+  return (
+    <article className="ai-chart-card">
+      <div className="ai-chart-head">
+        <span>{title}</span>
+        <small>{note}</small>
+      </div>
+      <div className="ai-grouped-bars">
+        {metrics.map((metric) => (
+          <div className={`ai-grouped-row ${metric.model === bestModel ? "best" : ""}`} key={`${title}-${metric.model}`}>
+            <span>{formatModelName(metric.model)}</span>
+            <div className="ai-grouped-track">
+              {series.map((item) => {
+                const value = clamp((Number(metric[item.key]) || 0) * 100, 0, 100);
+                return (
+                  <i
+                    key={item.key}
+                    style={{
+                      width: `${Math.max(value, 3)}%`,
+                      background: item.color,
+                    }}
+                    title={`${item.label}: ${formatNumber(value)}%`}
+                  />
+                );
+              })}
+            </div>
+            <b>{formatNumber((Number(metric[series[0].key]) || 0) * 100)}%</b>
+          </div>
+        ))}
+      </div>
+      <div className="ai-chart-legend">
+        {series.map((item) => <span key={item.key}><i style={{ background: item.color }} />{item.label}</span>)}
+      </div>
+    </article>
+  );
+}
+
+function ModelLiftChart({ title, note, metrics, baselineMacroF1, bestModel }) {
+  const lifts = metrics.map((metric) => ({
+    ...metric,
+    lift: ((Number(metric.macro_f1) || 0) - baselineMacroF1) * 100,
+  }));
+  const maxLift = Math.max(...lifts.map((metric) => Math.max(metric.lift, 0)), 1);
+
+  return (
+    <article className="ai-chart-card">
+      <div className="ai-chart-head">
+        <span>{title}</span>
+        <small>{note}</small>
+      </div>
+      <div className="ai-lift-bars">
+        {lifts.map((metric) => {
+          const lift = Math.max(metric.lift, 0);
+          return (
+            <div className={`ai-lift-row ${metric.model === bestModel ? "best" : ""}`} key={metric.model}>
+              <span>{formatModelName(metric.model)}</span>
+              <div><i style={{ width: `${Math.max((lift / maxLift) * 100, metric.lift > 0 ? 4 : 0)}%` }} /></div>
+              <b>{metric.lift > 0 ? `+${formatNumber(metric.lift)}` : "0"}đ</b>
+            </div>
+          );
+        })}
+      </div>
+    </article>
   );
 }
 
