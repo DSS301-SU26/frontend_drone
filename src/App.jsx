@@ -1459,10 +1459,10 @@ function formatDateTimeWithSeconds(value) {
 function formatModelName(value) {
   if (!value) return "--";
   const labels = {
-    decision_tree: "Cây quyết định",
-    random_forest: "Rừng quyết định",
-    logistic_regression: "Hồi quy xác suất",
-    baseline_majority: "Mốc so sánh đơn giản",
+    decision_tree: "Decision Tree",
+    random_forest: "Random Forest",
+    logistic_regression: "Logistic Regression",
+    baseline_majority: "Majority Baseline",
   };
   if (labels[value]) return labels[value];
   return value
