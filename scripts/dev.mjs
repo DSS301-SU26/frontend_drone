@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const backendRoot = path.resolve(frontendRoot, "../BE/agricultural-drone-scheduler");
-const uvicorn = path.join(backendRoot, ".venv/bin/uvicorn");
+const uvicorn = process.platform === "win32"
+  ? path.join(backendRoot, ".venv/Scripts/uvicorn.exe")
+  : path.join(backendRoot, ".venv/bin/uvicorn");
 const vite = path.join(frontendRoot, "node_modules/.bin/vite");
 const healthUrl = "http://127.0.0.1:8000/api/health";
 const viteArgs = process.argv.slice(2);
