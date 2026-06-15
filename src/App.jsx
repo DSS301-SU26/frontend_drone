@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
@@ -140,6 +140,7 @@ function App() {
   const [aiTrainingRun, setAiTrainingRun] = useState(null);
   const [aiTrainingBusyStep, setAiTrainingBusyStep] = useState("");
   const [aiTrainingRefreshing, setAiTrainingRefreshing] = useState(false);
+  const dailySyncInFlightRef = useRef(false);
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -245,9 +246,15 @@ function App() {
   useEffect(() => {
     let midnightTimeout;
 
-    const refreshIfNewDay = () => {
+    const refreshIfNewDay = async () => {
       if (window.localStorage.getItem(DAILY_SYNC_KEY) !== getLocalDateKey()) {
-        executePipelineRefresh(false);
+        if (dailySyncInFlightRef.current) return;
+        dailySyncInFlightRef.current = true;
+        try {
+          await executePipelineRefresh(false);
+        } finally {
+          dailySyncInFlightRef.current = false;
+        }
       }
     };
 
