@@ -5,6 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f6f8f3" />
     <title>AgriFlight DSS</title>
+    <!-- Tailwind CSS v3 CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                50: '#f2f7f4',
+                100: '#e5efea',
+                700: '#347566',
+                800: '#286658',
+                900: '#1d4e43',
+                950: '#163d35',
+              },
+              healthy: '#10b981',
+              stress: '#f59e0b',
+              dry: '#ef4444',
+            }
+          }
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

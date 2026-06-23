@@ -5,11 +5,20 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const backendRoot = path.resolve(frontendRoot, "../BE/agricultural-drone-scheduler");
+
+let backendRoot = path.resolve(frontendRoot, "../BE/agricultural-drone-scheduler");
+try {
+  await access(backendRoot);
+} catch {
+  backendRoot = path.resolve(frontendRoot, "../../BE_DSS/agricultural-drone-scheduler");
+}
+
 const uvicorn = process.platform === "win32"
   ? path.join(backendRoot, ".venv/Scripts/uvicorn.exe")
   : path.join(backendRoot, ".venv/bin/uvicorn");
-const vite = path.join(frontendRoot, "node_modules/.bin/vite");
+const vite = process.platform === "win32"
+  ? path.join(frontendRoot, "node_modules/.bin/vite.cmd")
+  : path.join(frontendRoot, "node_modules/.bin/vite");
 const healthUrl = "http://127.0.0.1:8000/api/health";
 const viteArgs = process.argv.slice(2);
 
@@ -68,6 +77,7 @@ async function start() {
   frontend = spawn(vite, viteArgs, {
     cwd: frontendRoot,
     stdio: "inherit",
+    shell: process.platform === "win32" ? true : false,
   });
   frontend.once("exit", (code) => stop(code ?? 0));
 }

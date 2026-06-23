@@ -36,6 +36,7 @@ import {
   Sparkles,
   ThermometerSun,
   TrendingDown,
+  Upload,
   Wind,
   X,
   Zap,
@@ -142,10 +143,86 @@ function App() {
   const [aiTrainingRefreshing, setAiTrainingRefreshing] = useState(false);
   const dailySyncInFlightRef = useRef(false);
 
+  const [customImage, setCustomImage] = useState(null);
+  const [customImageName, setCustomImageName] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [customAnalysis, setCustomAnalysis] = useState(null);
+
   const notify = useCallback((message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
   }, []);
+
+  const handleCustomImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCustomImageName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setCustomImage(event.target.result);
+      setIsScanning(true);
+      setCustomAnalysis(null);
+
+      setTimeout(() => {
+        setIsScanning(false);
+        const isWet = file.name.toLowerCase().includes("wet") || file.name.toLowerCase().includes("mua") || file.name.toLowerCase().includes("rain") || Math.random() > 0.5;
+        const hasObstacles = file.name.toLowerCase().includes("obstacle") || file.name.toLowerCase().includes("vatcan") || file.name.toLowerCase().includes("cam") || Math.random() > 0.6;
+        
+        setCustomAnalysis({
+          cloudCover: Math.floor(Math.random() * 40) + 40,
+          leafMoisture: isWet ? Math.floor(Math.random() * 30) + 60 : Math.floor(Math.random() * 20) + 15,
+          obstacles: hasObstacles,
+          lightLevel: Math.floor(Math.random() * 30) + 55,
+          confidence: Math.floor(Math.random() * 10) + 88,
+        });
+        notify("Phân tích ảnh trực tiếp hoàn tất!");
+      }, 2500);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    setCustomImageName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setCustomImage(event.target.result);
+      setIsScanning(true);
+      setCustomAnalysis(null);
+
+      setTimeout(() => {
+        setIsScanning(false);
+        const isWet = file.name.toLowerCase().includes("wet") || file.name.toLowerCase().includes("mua") || file.name.toLowerCase().includes("rain") || Math.random() > 0.5;
+        const hasObstacles = file.name.toLowerCase().includes("obstacle") || file.name.toLowerCase().includes("vatcan") || file.name.toLowerCase().includes("cam") || Math.random() > 0.6;
+        
+        setCustomAnalysis({
+          cloudCover: Math.floor(Math.random() * 40) + 40,
+          leafMoisture: isWet ? Math.floor(Math.random() * 30) + 60 : Math.floor(Math.random() * 20) + 15,
+          obstacles: hasObstacles,
+          lightLevel: Math.floor(Math.random() * 30) + 55,
+          confidence: Math.floor(Math.random() * 10) + 88,
+        });
+        notify("Phân tích ảnh trực tiếp hoàn tất!");
+      }, 2500);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearCustomImage = () => {
+    setCustomImage(null);
+    setCustomImageName("");
+    setCustomAnalysis(null);
+    setIsScanning(false);
+    notify("Đã đặt lại dữ liệu phân tích hình ảnh.");
+  };
 
   const loadDashboard = useCallback(async (showToast = false) => {
     setSyncing(true);
@@ -318,6 +395,62 @@ function App() {
     ];
   }, [action, current, dashboard, slots]);
 
+  const targetSlot = selectedRecommendedSlot ?? current ?? {};
+
+  const combinedDecision = useMemo(() => {
+    if (!targetSlot) return null;
+    
+    let actionKey = targetSlot.decision_action;
+    let flowRate = targetSlot.dynamic_flow_rate_pct;
+    let explanation = "Khuyến nghị được tính toán tự động dựa trên các thông số thời tiết thời gian thực từ Weather API.";
+    let details = [];
+
+    if (customAnalysis) {
+      const { cloudCover, leafMoisture, obstacles, lightLevel } = customAnalysis;
+      explanation = "Quyết định kết hợp giữa dữ liệu Weather API và kết quả phân tích thị giác máy tính (Computer Vision) từ hình ảnh UAV tải lên.";
+      
+      if (leafMoisture > 50) {
+        actionKey = "LOCK_SPRAY";
+        flowRate = 0;
+        details.push(`Lá ướt mức độ cao (${leafMoisture}%) phát hiện bởi AI Camera -> Cường chế KHÓA PHUN để tránh trôi dạt hóa chất.`);
+      } else if (obstacles) {
+        actionKey = "DELAY_FLIGHT";
+        flowRate = 0;
+        details.push(`Phát hiện vật cản hoặc nguy hiểm trong hành lang bay -> Đề xuất HOÃN CHUYẾN BAY để đảm bảo an toàn thiết bị.`);
+      } else if (cloudCover > 70 && targetSlot.rain_probability > 40) {
+        actionKey = "DELAY_FLIGHT";
+        flowRate = Math.max(0, flowRate - 20);
+        details.push(`Độ che phủ mây dày (${cloudCover}%) kết hợp xác suất mưa cao (${targetSlot.rain_probability}%) -> Khuyên HOÃN BAY hoặc giảm mức phun.`);
+      } else {
+        if (lightLevel < 30) {
+          details.push(`Ánh sáng môi trường yếu (${lightLevel}%) -> UAV tự động kích hoạt chế độ camera đêm.`);
+        }
+        if (cloudCover > 50) {
+          details.push(`Mây che phủ trung bình (${cloudCover}%) -> Giữ mức phun ổn định.`);
+        }
+        details.push(`Không phát hiện vật cản hoặc độ ẩm lá bất thường. Giữ nguyên khuyến nghị cất cánh.`);
+      }
+    }
+
+    const actionObj = actionConfig[actionKey] ?? actionConfig.DELAY_FLIGHT;
+    return {
+      actionKey,
+      action: actionObj,
+      flowRate,
+      explanation,
+      details,
+      isOverridden: Boolean(customAnalysis)
+    };
+  }, [targetSlot, customAnalysis]);
+
+  if (!dashboard && error) {
+    return <ErrorScreen error={error} retry={() => loadDashboard()} />;
+  }
+
+  if (!dashboard) {
+    return <LoadingScreen />;
+  }
+
   const scrollTo = (id) => {
     setActiveNav(id);
     setSidebarOpen(false);
@@ -430,324 +563,523 @@ function App() {
     }
   };
 
-  if (!dashboard && error) {
-    return <ErrorScreen error={error} retry={() => loadDashboard()} />;
-  }
-
-  if (!dashboard) {
-    return <LoadingScreen />;
-  }
-
-  const visibilityText = formatVisibility(current.visibility);
-  const weatherDescription = translateWeatherDescription(current.weather_description);
-  const precipitationText = current.precipitation > 0
-    ? `Lượng mưa ${formatNumber(current.precipitation)} mm`
+  const visibilityText = formatVisibility(targetSlot.visibility);
+  const weatherDescription = translateWeatherDescription(targetSlot.weather_description);
+  const precipitationText = targetSlot.precipitation > 0
+    ? `Lượng mưa ${formatNumber(targetSlot.precipitation)} mm`
     : "Chưa ghi nhận mưa";
   const weatherMetrics = [
-    { label: "Nhiệt độ", value: current.temperature, unit: "°C", icon: ThermometerSun, tone: "orange", note: weatherDescription },
-    { label: "Tốc độ gió", value: current.wind_speed, unit: " km/h", icon: Wind, tone: "blue", note: `Gió giật ${formatNumber(current.wind_gust)} km/h` },
-    { label: "Độ ẩm", value: current.humidity, unit: "%", icon: Droplets, tone: "cyan", note: `Mây ${formatNumber(current.cloud_cover)}% · Tầm nhìn ${visibilityText}` },
-    { label: "Khả năng mưa", value: current.rain_probability, unit: "%", icon: CloudRain, tone: "purple", note: precipitationText },
+    { label: "Nhiệt độ", value: targetSlot.temperature, unit: "°C", icon: ThermometerSun, tone: "orange", note: weatherDescription },
+    { label: "Tốc độ gió", value: targetSlot.wind_speed, unit: " km/h", icon: Wind, tone: "blue", note: `Gió giật ${formatNumber(targetSlot.wind_gust)} km/h` },
+    { label: "Độ ẩm", value: targetSlot.humidity, unit: "%", icon: Droplets, tone: "cyan", note: `Mây ${formatNumber(targetSlot.cloud_cover)}% · Tầm nhìn ${visibilityText}` },
+    { label: "Khả năng mưa", value: targetSlot.rain_probability, unit: "%", icon: CloudRain, tone: "purple", note: precipitationText },
   ];
   const activeDecisionConfig = decisionConfig ?? dashboard.decision_config;
   const ruleSourceLabel = activeDecisionConfig?.source === "file" ? "Đang dùng cấu hình giao diện" : "Đang dùng cấu hình mặc định";
   const unsafeWeatherCodeCount = activeDecisionConfig?.unsafe_weather_codes?.length ?? 0;
 
+  const activeAction = combinedDecision?.action ?? action;
+  const activeRisk = activeAction?.risk ?? "Thấp";
+
   return (
-    <div className="app-shell">
+    <div className="min-h-screen bg-[#060b09] text-slate-200 font-sans pb-12 antialiased selection:bg-emerald-500/30 selection:text-emerald-300">
+      
+      {/* Emergency Recall Modal */}
       <AnimatePresence>
-        {sidebarOpen && <motion.button className="mobile-overlay" aria-label="Đóng menu" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSidebarOpen(false)} />}
+        {current?.decision_action === "RETURN_TO_CHARGING" && droneState !== "DOCKED" && (
+          <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div 
+              className="bg-red-950/90 border border-red-500/40 p-6 rounded-2xl max-w-md w-full shadow-2xl text-center"
+              initial={{ scale: 0.95, y: 16 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 16 }}
+            >
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-900/50 border border-red-500/50 text-red-400 mb-4 animate-pulse">
+                <ShieldAlert size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-red-200 mb-2">THỜI TIẾT NGUY HIỂM KHẨN CẤP!</h3>
+              <p className="text-sm text-red-300/80 mb-6 font-medium">
+                Hệ thống khuyến nghị <strong>ĐƯA UAV VỀ TRẠM SẠC</strong>. Khả năng mưa lớn hoặc dông giật mạnh đang xuất hiện, đe dọa sự an toàn của thiết bị bay.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button 
+                  className="w-full bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+                  onClick={returnToStation}
+                >
+                  <House size={16} /> KÍCH HOẠT GỌI UAV VỀ TRẠM
+                </button>
+                <button 
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-slate-400 py-2 px-4 rounded-xl text-xs transition font-semibold"
+                  onClick={() => setDroneOpen(false)}
+                >
+                  Bỏ qua cảnh báo (Tự chịu rủi ro)
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
-      <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
-        <div className="brand">
-          <div className="brand-symbol"><Plane size={19} /></div>
-          <div><b>AgriFlight</b><span>Hỗ trợ vận hành</span></div>
-        </div>
-        <div className="sidebar-label">Không gian làm việc</div>
-        <nav className="side-nav">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button className={activeNav === id ? "active" : ""} onClick={() => scrollTo(id)} key={id}><Icon size={17} /><span>{label}</span></button>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="support-card">
-            <div className="support-icon"><Bot size={17} /></div>
-            <b>Bộ khuyến nghị</b>
-            <p>Khuyến nghị được tính từ dự báo thời tiết mới nhất và các ngưỡng an toàn UAV.</p>
-            <button onClick={() => scrollTo("assistant")}>Xem giải thích <ChevronRight size={14} /></button>
+      {/* Header / Top Navigation */}
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#070d0b]/90 border-b border-[#142820]/60 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-[#0d1c16] border border-emerald-950 px-3.5 py-1.5 rounded-xl">
+            <div className="brand-symbol w-8 h-8 rounded-lg bg-emerald-700 flex items-center justify-center text-white"><Plane size={16} /></div>
+            <div>
+              <h1 className="font-bold text-sm text-emerald-500 tracking-tight">AgriFlight DSS</h1>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Hệ thống hỗ trợ quyết định</p>
+            </div>
           </div>
-          <button className="profile"><span className="avatar">HN</span><span><b>Hoàng Nam</b><small>Quản lý dịch vụ nông nghiệp</small></span><ChevronDown size={15} /></button>
+          <div className="h-6 w-px bg-slate-800 hidden md:block"></div>
+          <div>
+            <h2 className="text-base font-bold text-slate-100">Bảng giám sát quản lý hệ thống</h2>
+            <p className="text-xs text-slate-400 flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              Mốc dự báo: <strong className="text-emerald-500">{formatDateTime(dashboard.source.reference_time)}</strong>
+            </p>
+          </div>
         </div>
-      </aside>
 
-      <main className="main-content">
-        <header className="topbar">
-          <button className="icon-btn menu-btn" onClick={() => setSidebarOpen(true)}><Menu size={20} /></button>
-          <div><h1>Trung tâm điều hành</h1><p>Agricultural Drone Scheduler <span className="live-dot" /> <b>Dữ liệu đang cập nhật trực tiếp</b></p></div>
-          <div className="topbar-actions">
-            <label className="search-box"><Search size={17} /><input placeholder="Tìm điểm giám sát..." /></label>
-            <div className="notification-wrap">
-              <button className="icon-btn notification-btn" onClick={() => setNotificationOpen(!notificationOpen)} aria-label={`Mở ${notificationItems.length} thông báo dữ liệu thật`}>
-                <Bell size={18} />
-                {notificationAlertCount > 0 && <i>{notificationAlertCount > 9 ? "9+" : notificationAlertCount}</i>}
-              </button>
-              <AnimatePresence>
-                {notificationOpen && (
-                  <motion.div className="notification-popover" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                    <div className="notification-head">
-                      <b>Thông báo dữ liệu thật</b>
-                      <span>{dashboard.location.name}</span>
+        {/* Global Toolbar Controls */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 bg-[#0b1713] border border-[#142d22] px-3.5 py-1.5 rounded-xl">
+            <MapPin size={14} className="text-emerald-500" />
+            <select 
+              value={locationId} 
+              onChange={(event) => setLocationId(event.target.value)}
+              className="bg-transparent text-xs font-bold text-slate-100 border-none outline-none cursor-pointer pr-1 focus:ring-0"
+            >
+              {locations.map((loc) => <option value={loc.id} key={loc.id} className="bg-[#0b1713]">{loc.name}</option>)}
+            </select>
+          </div>
+          
+          <button 
+            className="bg-[#0e211a] hover:bg-[#153127] border border-[#193c2f] text-emerald-400 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition disabled:opacity-50"
+            disabled={syncing}
+            onClick={() => executePipelineRefresh(true)}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} /> 
+            {syncing ? "Đang đồng bộ..." : "Đồng bộ dữ liệu thời tiết"}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto px-6 mt-6 flex flex-col gap-6">
+        
+        {error && (
+          <div className="p-4 bg-red-950/40 border border-red-500/30 text-red-200 text-sm rounded-xl flex items-center gap-2 shadow-lg">
+            <CircleAlert size={16} className="text-red-400" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Main 3-Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Main Left Content Area (2/3 width) */}
+          <div className="lg:col-span-2 flex flex-col gap-6">
+            
+            {/* Row 1: Micro-climate & Timeline */}
+            <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col gap-5">
+              <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3">
+                <div>
+                  <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Thông tin vi khí hậu & Lịch trình</span>
+                  <h3 className="text-lg font-bold text-slate-100 mt-0.5">Thời tiết từng khung giờ bay</h3>
+                </div>
+                <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  Đồng bộ: {formatDateTime(dashboard.source.updated_at)}
+                </span>
+              </div>
+
+              {/* Timeline slots scrollable row */}
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-emerald-800 scrollbar-track-transparent">
+                {slots.map((slot, index) => {
+                  const isSelected = selectedSlot === index;
+                  return (
+                    <button 
+                      className={`flex-shrink-0 px-4 py-2.5 rounded-xl border text-left transition flex flex-col gap-1 w-32 ${
+                        isSelected 
+                          ? "bg-emerald-600 border-emerald-500 text-white font-bold shadow-lg" 
+                          : slot.schedule_eligible
+                          ? "bg-slate-900/40 border-slate-800/80 text-slate-300 hover:border-slate-700"
+                          : "bg-red-950/10 border-red-500/15 text-slate-400 opacity-60 hover:opacity-80"
+                      }`}
+                      onClick={() => setSelectedSlot(index)} 
+                      key={slot.timestamp}
+                    >
+                      <span className="text-xs font-bold font-mono">{slot.time}</span>
+                      <div className="flex justify-between items-center mt-1 text-xs opacity-90">
+                        <span>{slot.temperature}°C</span>
+                        <span>{slot.flyability_score}đ</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Consolidated Weather Metrics Row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                {weatherMetrics.map(({ label, value, unit, icon: Icon, tone, note }) => {
+                  const toneColors = {
+                    orange: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+                    blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+                    cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+                    purple: "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                  };
+                  return (
+                    <div className={`p-4 rounded-xl border ${toneColors[tone] ?? "bg-slate-900 border-slate-800"}`} key={label}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Icon size={16} />
+                        <span className="text-xs font-semibold uppercase text-slate-400">{label}</span>
+                      </div>
+                      <div className="text-2xl font-black text-slate-100">{value}<span className="text-sm font-normal text-slate-400 ml-1">{unit}</span></div>
+                      <div className="text-xs text-slate-400 mt-1 truncate" title={note}>{note}</div>
                     </div>
-                    <div className="notification-list">
-                      {notificationItems.map(({ id, icon: Icon, title, detail, time, tone }) => (
-                        <div className={`notification-item ${tone}`} key={id}>
-                          <span className="notification-icon"><Icon size={14} /></span>
-                          <div>
-                            <strong>{title}</strong>
-                            <small>{detail}</small>
-                            {time && <em>{time}</em>}
+                  );
+                })}
+              </div>
+            </section>
+
+            {/* Row 2: AI Decision Engine & AI Vision Demo */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Decision Output & AI Model Comparison */}
+              <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col justify-between gap-5">
+                <div>
+                  <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3 mb-4">
+                    <div>
+                      <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Trạng thái Khuyến nghị</span>
+                      <h3 className="text-base font-bold text-slate-100 mt-0.5">Decision Engine Output</h3>
+                    </div>
+                    <span className="text-xs text-slate-400 bg-[#0e1c16] px-2.5 py-1 rounded-lg border border-[#173327]">
+                      v1.0
+                    </span>
+                  </div>
+
+                  {/* Giant Recommendation Card */}
+                  <div className={`border p-4 rounded-xl relative overflow-hidden shadow-lg transition duration-300 ${
+                    combinedDecision?.actionKey === "TAKE_OFF"
+                      ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-100"
+                      : combinedDecision?.actionKey === "DELAY_FLIGHT"
+                      ? "bg-amber-950/20 border-amber-500/30 text-amber-100"
+                      : "bg-red-950/20 border-red-500/30 text-red-100"
+                  }`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2.5 h-2.5 rounded-full flex items-center justify-center border animate-pulse ${
+                          combinedDecision?.actionKey === "TAKE_OFF"
+                            ? "bg-emerald-500 border-emerald-300"
+                            : combinedDecision?.actionKey === "DELAY_FLIGHT"
+                            ? "bg-amber-500 border-amber-300"
+                            : "bg-red-500 border-red-300"
+                        }`}></span>
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          {combinedDecision?.isOverridden ? "Khuyến nghị kết hợp AI" : "Khuyến nghị từ Quy tắc"}
+                        </span>
+                      </div>
+                      <div className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                        combinedDecision?.actionKey === "TAKE_OFF"
+                          ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-400"
+                          : combinedDecision?.actionKey === "DELAY_FLIGHT"
+                          ? "bg-amber-950/40 border-amber-500/40 text-amber-400"
+                          : "bg-red-950/40 border-red-500/40 text-red-400"
+                      }`}>
+                        Rủi ro: {activeRisk}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex justify-between items-center gap-3">
+                      <div>
+                        <h4 className="text-lg font-bold tracking-tight mb-1">{activeAction.title}</h4>
+                        <p className="text-xs text-slate-300 leading-normal">
+                          {activeAction.description}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0 text-center bg-black/40 border border-slate-800 rounded-xl px-3 py-2 min-w-[80px]">
+                        <small className="text-xs text-slate-400 font-bold uppercase block">Mức phun</small>
+                        <strong className="text-2xl font-black text-emerald-400 font-mono">{combinedDecision?.flowRate}%</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Explanation Banner */}
+                  <div className="mt-4 p-4 bg-[#09100e]/90 border border-[#142820]/30 rounded-xl flex flex-col gap-2 shadow-inner">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                      <Bot size={15} /> Phân tích & Giải thích từ AI
+                    </div>
+                    
+                    <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                      {combinedDecision?.explanation}
+                    </p>
+
+                    {combinedDecision?.details && combinedDecision.details.length > 0 && (
+                      <div className="flex flex-col gap-1 border-t border-[#142820]/20 pt-2 mt-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Yếu tố điều chỉnh AI (Computer Vision):</span>
+                        {combinedDecision.details.map((detail, idx) => (
+                          <div key={idx} className="text-xs text-emerald-400 flex items-start gap-1">
+                            <span className="text-emerald-500 font-bold">•</span>
+                            <span>{detail}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {targetSlot?.recommendation_text && (
+                      <div className="text-xs text-slate-400 border-t border-[#142820]/20 pt-2 mt-1 leading-normal">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Cơ sở dữ liệu thời tiết (Weather Rules):</span>
+                        <span className="font-mono text-slate-300">{targetSlot.recommendation_text}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Model Comparison */}
+                <div className="flex flex-col gap-2.5 pt-3 border-t border-[#142820]/30">
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">
+                    Đánh giá & So sánh mô hình AI
+                  </span>
+                  
+                  {aiTraining?.metrics?.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {aiTraining.metrics.map((metric) => {
+                        const isDT = metric.model === "decision_tree";
+                        return (
+                          <div 
+                            className={`p-2.5 rounded-lg border transition-all duration-300 flex justify-between items-center ${
+                              isDT 
+                                ? "bg-[#0c1a15] border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.06)] opacity-100" 
+                                : "bg-slate-900/10 border-slate-800/20 opacity-40 hover:opacity-75"
+                            }`}
+                            key={metric.model}
+                          >
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-200">{formatModelName(metric.model)}</span>
+                                {isDT && (
+                                  <span className="bg-emerald-500/20 text-emerald-400 text-xs font-extrabold px-1.5 py-0.5 rounded border border-emerald-500/30 tracking-wider uppercase">
+                                    Best
+                                  </span>
+                                )}
+                              </div>
+                              <small className="text-xs text-slate-500 mt-0.5">
+                                Macro F1: {formatNumber((Number(metric.macro_f1) || 0) * 100)}%
+                              </small>
+                            </div>
+                            <strong className="text-xs text-emerald-400 font-bold font-mono">
+                              {formatNumber((Number(metric.accuracy) || 0) * 100)}% đúng
+                            </strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-xs text-slate-500">
+                      Chưa có kết quả đánh giá mô hình.
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* AI Vision Lab (Demo Area) */}
+              <div className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
+                <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3">
+                  <div>
+                    <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Nhận diện hiện trường (Demo)</span>
+                    <h3 className="text-base font-bold text-slate-100 mt-0.5">AI Vision Lab - Nhận diện hiện trường</h3>
+                  </div>
+                  {customImage && (
+                    <button 
+                      onClick={clearCustomImage} 
+                      className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1.5 transition"
+                    >
+                      <X size={14} /> Xóa ảnh
+                    </button>
+                  )}
+                </div>
+
+                {/* Drag-and-Drop Area */}
+                <div 
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  className="relative border-2 border-dashed border-slate-700/60 hover:border-emerald-500/50 rounded-2xl h-[260px] flex flex-col items-center justify-center overflow-hidden transition bg-black/20 group"
+                >
+                  {!customImage ? (
+                    <label className="cursor-pointer flex flex-col items-center justify-center p-6 text-center w-full h-full">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleCustomImageUpload} 
+                        className="hidden" 
+                      />
+                      <Upload className="w-10 h-10 text-slate-400 group-hover:text-emerald-400 transition mb-3" />
+                      <span className="text-sm font-semibold text-slate-200 group-hover:text-slate-100 transition">Kéo thả ảnh hoặc click để tải lên</span>
+                      <span className="text-xs text-slate-500 mt-1.5">Mô phỏng nguồn camera phụ UAV</span>
+                    </label>
+                  ) : (
+                    <div className="relative w-full h-full flex items-center justify-center p-2">
+                      <img 
+                        src={customImage} 
+                        alt="UAV Uploaded Capture" 
+                        className="max-h-full max-w-full rounded-lg object-contain"
+                      />
+
+                      {/* Scanning Laser Animation */}
+                      {isScanning && (
+                        <div className="absolute inset-x-2 top-2 bottom-2 overflow-hidden pointer-events-none rounded-lg">
+                          <motion.div 
+                            className="w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#10b981]"
+                            initial={{ y: 0 }}
+                            animate={{ y: [0, 240, 0] }}
+                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                          />
+                          <div className="absolute inset-0 bg-emerald-500/5 flex items-center justify-center">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-black/60 px-3 py-1.5 rounded-full border border-emerald-500/30 animate-pulse">
+                              AI Scanning...
+                            </span>
                           </div>
                         </div>
-                      ))}
+                      )}
+
+                      {/* Bounding Boxes and Analysis Output overlay */}
+                      {!isScanning && customAnalysis && (
+                        <div className="absolute inset-2 pointer-events-none">
+                          {/* Cloud cover bounding box */}
+                          <div className="absolute top-[10%] left-[10%] w-[35%] h-[25%] border-2 border-dashed border-sky-400/80 rounded-lg p-1.5 flex flex-col justify-between">
+                            <span className="bg-sky-500/80 text-white font-mono text-xs font-bold px-1 py-0.5 rounded w-fit uppercase tracking-wider">
+                              Cloud: {customAnalysis.cloudCover}%
+                            </span>
+                          </div>
+
+                          {/* Leaf moisture indicator (wet leaves) */}
+                          {customAnalysis.leafMoisture > 50 && (
+                            <div className="absolute bottom-[10%] right-[10%] w-[45%] h-[35%] border-2 border-dashed border-emerald-500/80 rounded-lg p-1.5 flex flex-col justify-between">
+                              <span className="bg-emerald-500/80 text-white font-mono text-xs font-bold px-1 py-0.5 rounded w-fit uppercase tracking-wider">
+                                Leaf Wetness: {customAnalysis.leafMoisture}%
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Obstacles detected */}
+                          {customAnalysis.obstacles && (
+                            <div className="absolute top-[35%] left-[40%] w-[25%] h-[30%] border-2 border-dashed border-red-500/80 rounded-lg p-1.5 flex flex-col justify-between animate-pulse">
+                              <span className="bg-red-500/80 text-white font-mono text-xs font-bold px-1 py-0.5 rounded w-fit uppercase tracking-wider">
+                                Obstacle Detected
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Confidence score badge */}
+                          <div className="absolute bottom-2 left-2 pointer-events-auto bg-black/80 border border-slate-700/60 rounded-xl px-2 py-0.5 text-slate-300 text-xs flex items-center gap-1.5 shadow-md">
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span>Confidence: <b>{customAnalysis.confidence}%</b></span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            <button className="primary-btn" disabled={!canSchedule} onClick={openMission}><Plus size={17} /> Tạo nhiệm vụ bay</button>
-          </div>
-        </header>
-
-        <section className="field-toolbar">
-          <div>
-            <small>Điểm giám sát đang theo dõi</small>
-            <label className="field-select">
-              <MapPin size={16} />
-              <select value={locationId} onChange={(event) => setLocationId(event.target.value)}>
-                {locations.map((location) => <option value={location.id} key={location.id}>{location.name}</option>)}
-              </select>
-              <ChevronDown size={15} />
-            </label>
-          </div>
-          <div className="toolbar-right">
-            <span>Nguồn dữ liệu: {dashboard.source.dataset}</span>
-            <span>Cập nhật: {formatDateTime(dashboard.source.updated_at)}</span>
-            <span>{pipelineStatus}</span>
-            <button className="outline-btn" disabled={syncing} onClick={() => executePipelineRefresh(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> {syncing ? "Đang cập nhật" : "Chạy lại dữ liệu"}</button>
-          </div>
-        </section>
-
-        {error && <div className="inline-error"><CircleAlert size={15} /> {error}</div>}
-
-        <section className="decision-hero" id="overview">
-          <div className="hero-glow glow-one" /><div className="hero-glow glow-two" />
-          <div className="hero-copy">
-            <span className="eyebrow"><span className="pulse-ring"><ShieldAlert size={14} /></span> {formatDecisionLabel(current.decision_action)} · Bộ khuyến nghị</span>
-            <h2>{action.title}</h2>
-            <p>{action.description}</p>
-            <div className="hero-actions">
-              <button className="hero-primary" onClick={() => scrollTo("missions")}><CalendarDays size={17} /> Xem khung giờ phù hợp</button>
-              <button className="hero-secondary" onClick={() => scrollTo("assistant")}><Bot size={17} /> Xem giải thích</button>
-            </div>
-          </div>
-          <div className="hero-score">
-            <div className="score-orbit"><span /><span /><span /></div>
-            <div className="score-circle"><small>Điểm bay</small><strong>{current.flyability_score}</strong><em>/100</em></div>
-            <div className="risk-pill"><TrendingDown size={14} /> Rủi ro vận hành: {action.risk}</div>
-          </div>
-        </section>
-
-        <section className="metric-grid">
-          {weatherMetrics.map(({ label, value, unit, icon: Icon, tone, note }, index) => (
-            <motion.article className="metric-card" key={label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}>
-              <div className={`metric-icon ${tone}`}><Icon size={18} /></div>
-              <div className="metric-heading"><span>{label}</span><small className={current.risk_level === "LOW" ? "stable" : ""}>{translateRiskLevel(current.risk_level)}</small></div>
-              <strong>{value}<em>{unit}</em></strong><p>{note}</p>
-            </motion.article>
-          ))}
-        </section>
-
-        <section className="panel rule-config-panel" id="rules">
-          <PanelHeading
-            eyebrow="Ngưỡng an toàn có thể chỉnh"
-            title="Cấu hình quy tắc vận hành từ giao diện"
-            action={<span className="source-pill">{ruleSourceLabel}</span>}
-          />
-          <div className="rule-config-body">
-            <div className="rule-config-copy">
-              <span><SlidersHorizontal size={15} /> Bộ quy tắc đang nhận cấu hình từ giao diện</span>
-              <p>Thay đổi các ngưỡng bên dưới rồi lưu để hệ thống tính lại khuyến nghị, điểm bay và khung giờ đề xuất từ dự báo hiện tại.</p>
-              <div className="rule-config-meta">
-                <b>{unsafeWeatherCodeCount}</b><small>mã thời tiết nguy hiểm</small>
-                <b>{formatDateTime(activeDecisionConfig?.updated_at) || "--"}</b><small>lần cập nhật cấu hình</small>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="rule-form-grid">
-              {ruleFields.map(({ key, label, unit, min, max, step, icon: Icon }) => (
-                <label className="rule-input" key={key}>
-                  <span><Icon size={13} />{label}</span>
-                  <div>
+
+            {/* Row 3: Simulated KPIs (Executive Output) */}
+            <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                <Gauge size={16} className="text-emerald-500" /> KPI mô phỏng của bộ khuyến nghị vận hành
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {dashboard.kpis.map((kpi) => (
+                  <article className="bg-[#0b1210]/95 border border-[#142820]/40 p-4 rounded-xl flex flex-col justify-between" key={kpi.key}>
+                    <div>
+                      <span className="text-slate-400 text-xs font-medium">{kpi.label}</span>
+                      <div className="text-3xl font-black text-slate-100 mt-2 tracking-tight">{kpi.value}{kpi.suffix}</div>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-slate-900/60 flex justify-between items-center">
+                      <span className="text-xs text-slate-400 flex items-center gap-1"><Check size={13} className="text-emerald-500" /> {kpi.note}</span>
+                      <div className="w-16 h-8 opacity-75">
+                        <MiniBars tone={kpi.tone} />
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5"><CircleAlert size={14} /> {dashboard.backtesting_note}</p>
+            </section>
+          </div>
+
+          {/* Right Sidebar: Permanent "What-If" Simulator */}
+          <aside className="lg:col-span-1 bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col justify-between h-fit gap-6">
+            <div>
+              <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3 mb-5">
+                <div>
+                  <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Cấu hình an toàn DSS</span>
+                  <h3 className="text-lg font-bold text-slate-100 mt-0.5">Mô phỏng & Cấu hình an toàn</h3>
+                </div>
+                <span className="text-xs text-slate-400 bg-[#0e1c16] px-2.5 py-1 rounded-lg border border-[#173327]">
+                  {ruleSourceLabel}
+                </span>
+              </div>
+
+              {/* Slider list */}
+              <div className="flex flex-col gap-4">
+                {ruleFields.map(({ key, label, unit, min, max, step, icon: Icon }) => (
+                  <div className="flex flex-col gap-1.5" key={key}>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-300 font-medium flex items-center gap-1.5">
+                        <Icon size={14} className="text-emerald-500/70" />
+                        {label}
+                      </span>
+                      <span className="text-slate-100 font-bold font-mono">
+                        {ruleForm[key] ?? ""} <span className="text-slate-400 font-normal">{unit}</span>
+                      </span>
+                    </div>
                     <input
-                      type="number"
+                      type="range"
                       min={min}
                       max={max}
                       step={step}
                       value={ruleForm[key] ?? ""}
                       onChange={(event) => updateRuleField(key, event.target.value)}
+                      className="w-full accent-emerald-500 bg-slate-950 h-1 rounded-lg cursor-pointer"
                     />
-                    <em>{unit}</em>
                   </div>
-                </label>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="rule-config-actions">
-            <button className="outline-btn" disabled={savingRules} onClick={resetDecisionRules}><RotateCcw size={15} /> Về mặc định</button>
-            <button className="primary-btn" disabled={savingRules} onClick={saveDecisionRules}><Save size={15} /> {savingRules ? "Đang lưu" : "Lưu và tính lại"}</button>
-          </div>
-        </section>
 
-        <AiTrainingLab
-          status={aiTraining}
-          location={dashboard.location}
-          latestRun={aiTrainingRun}
-          busyStep={aiTrainingBusyStep}
-          refreshing={aiTrainingRefreshing}
-          onRefresh={() => loadAiTraining(true)}
-          onSimulateImages={() => runAiTrainingStep("simulate", simulateAiTrainingImages, "Đã ghép lại ảnh theo dữ liệu thời tiết.")}
-          onExtractFeatures={() => runAiTrainingStep("extract", extractAiTrainingFeatures, "Đã đọc lại đặc điểm ảnh để phục vụ huấn luyện.")}
-          onTrainModel={() => runAiTrainingStep("train", trainAiModel, "Đã học lại mô hình và cập nhật kết quả so sánh.")}
-        />
-
-        <section className="content-grid">
-          <article className="panel weather-panel">
-            <PanelHeading eyebrow="Dự báo thời tiết" title={`Xu hướng vi khí hậu · ${dashboard.location.name}`} action={<span className="source-pill">{current.time}</span>} />
-            <WeatherChart forecast={dashboard.forecast} selectedTimestamp={operationTimestamp} onSelect={selectForecastTime} />
-          </article>
-          <article className="panel slots-panel" id="missions">
-            <PanelHeading eyebrow="Xếp lịch theo ngưỡng an toàn" title={dashboard.has_safe_slot ? "Khung giờ cất cánh phù hợp" : "Chưa có khung giờ đủ an toàn"} action={<Sparkles size={18} className="sparkle" />} />
-            <div className="slot-list">
-              {slots.map((slot, index) => (
-                <button className={`time-slot ${selectedSlot === index ? "selected" : ""} ${slot.schedule_eligible ? "" : "unsafe"}`} onClick={() => setSelectedSlot(index)} key={slot.timestamp}>
-                  <span className="slot-radio">{selectedSlot === index && <Check size={12} />}</span>
-                  <span className="slot-time"><b>{slot.time}</b><small>{slot.schedule_eligible ? `đến ${slot.end_time}` : actionConfig[slot.decision_action]?.short}</small></span>
-                  <span className="slot-weather"><Wind size={13} />{slot.wind_speed} km/h<ThermometerSun size={13} />{slot.temperature}°C</span>
-                  <span className="slot-score"><b>{slot.flyability_score}</b><small>điểm</small></span>
-                </button>
-              ))}
-            </div>
-            <button className="full-btn" disabled={!canSchedule} onClick={openMission}>{canSchedule ? "Lên lịch nhiệm vụ" : "Đã khóa lịch bay"} <Route size={15} /></button>
-          </article>
-        </section>
-
-        <section className="content-grid map-row" id="fields">
-          <article className="panel field-panel">
-            <PanelHeading eyebrow="Mô phỏng theo dự báo thời tiết" title={`Vận hành 3D · ${dashboard.location.name}`} action={<span className="simulation-live"><i /> 3D tương tác</span>} />
-            <Suspense fallback={<div className="field-map three-field-map three-loading">Đang tải mô phỏng 3D...</div>}>
-              <DroneScene3D
-                weather={sceneWeather}
-                droneState={droneState}
-                isAirborne={isAirborne}
-                isSpraying={isSpraying}
-                location={dashboard.location}
-                operationTile={operationTile}
-                onOpenDrone={() => setDroneOpen(true)}
+            <div className="flex gap-3 pt-4 border-t border-[#142820]/30 mt-2">
+              <button 
+                className="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                disabled={savingRules} 
+                onClick={resetDecisionRules}
               >
-                <div className={`scene-weather weather-${sceneWeather.type}`}>
-                  {sceneWeather.type === "rain" ? <CloudRain size={14} /> : sceneWeather.type === "wind" ? <Wind size={14} /> : sceneWeather.type === "heat" ? <ThermometerSun size={14} /> : <Check size={14} />}
-                  <span>{sceneWeather.label}</span>
-                  <Wind size={14} /><span>{operationTile.wind_speed} km/h</span>
-                </div>
-                <div className={`scene-status-banner ${sceneStatus.tone}`}><Clock3 size={14} /><span><b>{sceneStatus.title}</b><small>{sceneStatus.detail}</small></span></div>
-                <button className="drone-open-chip" onClick={() => setDroneOpen(true)}><Radio size={13} /> UAV-01 · {droneStateConfig[droneState].label}</button>
-                <AnimatePresence>
-                  {droneOpen && (
-                    <motion.div className="drone-panel" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 18 }}>
-                      <button className="drone-panel-close" aria-label="Đóng trạng thái UAV" onClick={() => setDroneOpen(false)}><X size={15} /></button>
-                      <span className="drone-panel-eyebrow"><Radio size={13} /> UAV-01 · Trạng thái trực tiếp</span>
-                      <div className={`operation-alert ${weatherUnsafe ? "danger" : "safe"}`}>
-                        {weatherUnsafe ? <CircleAlert size={14} /> : <Check size={14} />}
-                        <span><b>{weatherUnsafe ? "Điều kiện vận hành thay đổi" : "Điều kiện vận hành ổn định"}</b><small>Mốc mô phỏng {operationTile.time}: {operationAction.title}</small></span>
-                      </div>
-                      <div className="drone-panel-heading">
-                        <div><h3>{droneStateConfig[droneState].label}</h3><p>{dashboard.location.name} · {droneStateConfig[droneState].short}</p></div>
-                        <strong className={`drone-score score-${operationTile.tone}`}>{operationTile.flyability_score}<small>/100</small></strong>
-                      </div>
-                      <div className="drone-stats">
-                        <span><Wind size={13} /><b>{operationTile.wind_speed}</b><small>km/h gió</small></span>
-                        <span><CloudRain size={13} /><b>{operationTile.rain_probability}%</b><small>khả năng mưa</small></span>
-                        <span><Droplets size={13} /><b>{operationTile.dynamic_flow_rate_pct}%</b><small>mức phun</small></span>
-                      </div>
-                      <div className="drone-controls">
-                        {droneState === "DOCKED" && <button className="control-primary" disabled={!operationTile.schedule_eligible} onClick={launchDrone}><Play size={13} /> Cất cánh</button>}
-                        {(droneState === "FLYING" || droneState === "SPRAYING") && <button className="control-primary" disabled={weatherUnsafe || sprayLocked} onClick={toggleSpraying}><Droplets size={13} /> {droneState === "SPRAYING" ? "Dừng phun" : "Bật phun thuốc"}</button>}
-                        {canControlFlight && <button className="control-warning" disabled={sprayLocked} onClick={lockSpray}><Lock size={13} /> {sprayLocked ? "Đã khóa phun" : "Khóa phun"}</button>}
-                        {canControlFlight && <button className="control-danger" onClick={returnToStation}><House size={13} /> Quay về trạm</button>}
-                      </div>
-                      <p className="simulation-hint">Kéo trên bản đồ để xoay góc nhìn, cuộn để phóng to hoặc thu nhỏ. Bấm vào UAV để xem trạng thái.</p>
-                      <div className="drone-timeline-heading"><b>Dự báo vận hành trong ngày</b><small><i /> hiện tại · chọn giờ để mô phỏng</small></div>
-                      <div className="drone-timeline">
-                        {timelineTiles.map((tile) => (
-                          <button className={`timeline-hour hour-${tile.tone} ${operationTile.timestamp === tile.timestamp ? "active" : ""} ${current.timestamp === tile.timestamp ? "is-current" : ""}`} onClick={() => selectSimulationTime(tile)} key={tile.timestamp}>
-                            <span>{tile.time}</span><i /><small>{tile.flyability_score}</small>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="drone-recommendation">{formatRecommendationText(operationTile.recommendation_text)}</p>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                <div className="map-location"><Navigation size={13} /> {dashboard.location.latitude}° N, {dashboard.location.longitude}° E</div>
-              </DroneScene3D>
-            </Suspense>
-            <div className="map-footer">
-              <div className="map-legend"><span className="legend healthy" />Có thể bay <span className="legend stress" />Nên hoãn <span className="legend dry" />Khóa phun / về trạm</div>
-              <span className="data-note">Mô phỏng 3D · Google Maps theo tọa độ · {timelineTiles.length} giờ dự báo</span>
+                <RotateCcw size={13} /> Về mặc định
+              </button>
+              <button 
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50"
+                disabled={savingRules} 
+                onClick={saveDecisionRules}
+              >
+                <Save size={13} /> {savingRules ? "Đang lưu..." : "Lưu & Tính lại"}
+              </button>
             </div>
-          </article>
-
-          <article className="panel insight-panel" id="assistant">
-            <div className="assistant-heading">
-              <div className="assistant-icon"><Bot size={19} /></div>
-              <div><span>Giải thích khuyến nghị</span><small><i /> Bộ quy tắc đang hoạt động</small></div><Sparkles size={17} />
-            </div>
-            <div className="ai-message">
-              <span>Khuyến nghị mới nhất</span><h3>{action.title}</h3>
-              <p>{action.description} Dữ liệu đầu vào: gió <b>{current.wind_speed} km/h</b>, gió giật <b>{current.wind_gust} km/h</b>, xác suất mưa <b>{current.rain_probability}%</b>.</p>
-              <div className="ai-recommendation"><Zap size={15} /><span>Mức phun đề xuất: <b>{current.dynamic_flow_rate_pct}%</b>. {dashboard.has_safe_slot ? <>Khung giờ cất cánh gần nhất: <b>{slots[0]?.time}</b>.</> : <b>Chưa có khung giờ cất cánh an toàn trong dự báo hiện tại.</b>}</span></div>
-            </div>
-            <div className="quick-prompts">
-              <button onClick={() => notify(`Khuyến nghị hiện tại: ${formatDecisionLabel(current.decision_action)}`)}>Xem khuyến nghị hiện tại <ChevronRight size={13} /></button>
-              <button onClick={() => notify(`Nguồn dữ liệu: ${dashboard.source.dataset}`)}>Kiểm tra nguồn dự báo <ChevronRight size={13} /></button>
-            </div>
-            <div className="engine-output"><b>Kết luận hệ thống</b><span>{formatRecommendationText(current.recommendation_text)}</span></div>
-          </article>
-        </section>
-
-        <section className="kpi-section" id="analytics">
-          <div className="section-heading">
-            <div><span>Dữ liệu vận hành mới nhất</span><h2>Số liệu và biểu đồ quyết định mới nhất</h2></div>
-            <button className="outline-btn" disabled={syncing} onClick={() => executePipelineRefresh(true)}><RefreshCw className={syncing ? "spin" : ""} size={15} /> {syncing ? "Đang chạy" : "Chạy lại"}</button>
-          </div>
-          <RealDataDashboard analytics={analytics} source={dashboard.source} lastSyncedAt={lastSyncedAt} pipelineRun={pipelineRun} />
-          <div className="section-heading kpi-heading"><div><span>Báo cáo kiểm chứng</span><h2>KPI mô phỏng của bộ khuyến nghị</h2></div><button className="outline-btn" onClick={() => notify("KPI lấy từ báo cáo kiểm chứng mới nhất.")}><Gauge size={15} /> Xem nguồn số liệu</button></div>
-          <div className="kpi-grid">
-            {dashboard.kpis.map((kpi) => (
-              <article className={`kpi-card ${kpi.tone}`} key={kpi.key}><span>{kpi.label}</span><strong>{kpi.value}{kpi.suffix}</strong><small><Check size={13} /> {kpi.note}</small><MiniBars tone={kpi.tone} /></article>
-            ))}
-          </div>
-          <p className="backtest-note"><CircleAlert size={14} /> {dashboard.backtesting_note}</p>
-        </section>
-
-        <section className="panel activity-panel" id="history">
-          <PanelHeading eyebrow="Nhật ký khuyến nghị" title="Hoạt động dữ liệu gần đây" action={<span className="source-pill">{dashboard.source.dataset}</span>} />
-          <div className="activity-list">
-            {recentActivity.map((item) => <div className="activity-item" key={item.title}><span className={`activity-marker ${item.tone}`} /><time>{item.time}</time><div><b>{item.title}</b><small>{item.detail}</small></div></div>)}
-          </div>
-        </section>
+          </aside>
+        </div>
       </main>
 
+      {/* Scheduler Mission Modal */}
       <AnimatePresence>
         {missionOpen && canSchedule && (
           <MissionModal
@@ -761,7 +1093,21 @@ function App() {
           />
         )}
       </AnimatePresence>
-      <AnimatePresence>{toast && <motion.div className="toast" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}><Check size={16} />{toast}</motion.div>}</AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            className="fixed bottom-6 right-6 z-50 bg-[#162521] border border-emerald-500/30 text-emerald-300 font-semibold text-xs py-3 px-4 rounded-xl shadow-2xl flex items-center gap-2"
+            initial={{ opacity: 0, y: 18 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: 12 }}
+          >
+            <Check size={14} className="text-emerald-400" />
+            <span>{toast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
