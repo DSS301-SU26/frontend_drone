@@ -14,12 +14,22 @@ export function getLocations() {
   return request("/api/locations");
 }
 
-export function getDashboard(location) {
+export function getDashboardSlots(location, at = null, farmSize = 10.0) {
   const params = new URLSearchParams({
     location,
+    farm_size_ha: farmSize.toString(),
     refresh: Date.now().toString(),
   });
-  return request(`/api/dashboard?${params.toString()}`);
+  if (at) params.set("at", at);
+  return request(`/api/dashboard/slots?${params.toString()}`);
+}
+
+export function askChatbot(question) {
+  return request("/api/chat/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
 }
 
 export function getDecisionConfig() {

@@ -44,7 +44,8 @@ import {
 import {
   extractAiTrainingFeatures,
   getAiTrainingStatus,
-  getDashboard,
+  getDashboardSlots,
+  askChatbot,
   getDecisionConfig,
   getLocations,
   resetDecisionConfig,
@@ -116,6 +117,19 @@ const ruleFields = [
   { key: "min_visibility", label: "Tầm nhìn tối thiểu", unit: "m", min: 0, max: 50000, step: 100, icon: Navigation },
 ];
 
+const translateRiskLevel = (risk) => {
+  if (risk === "LOW") return "Thấp";
+  if (risk === "MEDIUM") return "Trung bình";
+  if (risk === "HIGH") return "Cao";
+  return risk || "Chưa rõ";
+};
+
+const localKpis = [
+  { key: "risk_reduction", label: "Rủi ro vận hành giảm", value: 76.74, suffix: "%", note: "Tránh giông lốc & gió giật", tone: "healthy" },
+  { key: "waste_reduction", label: "Lãng phí hóa chất giảm", value: 96.5, suffix: "%", note: "Khóa phun khi gió lớn", tone: "healthy" },
+  { key: "evaluated_samples", label: "Mẫu dữ liệu kiểm chứng", value: 840, suffix: " mẫu", note: "240 giờ hoạt động thực tế", tone: "neutral" }
+];
+
 function App() {
   const [locations, setLocations] = useState([]);
   const [locationId, setLocationId] = useState("Dong Thap");
@@ -143,96 +157,49 @@ function App() {
   const [aiTrainingRefreshing, setAiTrainingRefreshing] = useState(false);
   const dailySyncInFlightRef = useRef(false);
 
-  const [customImage, setCustomImage] = useState(null);
-  const [customImageName, setCustomImageName] = useState("");
-  const [isScanning, setIsScanning] = useState(false);
-  const [customAnalysis, setCustomAnalysis] = useState(null);
+  const [farmSize, setFarmSize] = useState(10.0);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatHistory, setChatHistory] = useState([
+    { sender: "ai", text: "Chào bạn! Tôi là AI Assistant của AgriFlight DSS. Tôi có thể giải đáp các thắc mắc về lịch sử hoạt động và quyết định bay của hệ thống." }
+  ]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const notify = useCallback((message) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 3200);
   }, []);
 
-  const handleCustomImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleSendChatMessage = async (e) => {
+    e?.preventDefault();
+    if (!chatInput.trim() || isChatLoading) return;
 
-    setCustomImageName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setCustomImage(event.target.result);
-      setIsScanning(true);
-      setCustomAnalysis(null);
+    const userMessage = { sender: "user", text: chatInput };
+    setChatHistory((prev) => [...prev, userMessage]);
+    setChatInput("");
+    setIsChatLoading(true);
 
-      setTimeout(() => {
-        setIsScanning(false);
-        const isWet = file.name.toLowerCase().includes("wet") || file.name.toLowerCase().includes("mua") || file.name.toLowerCase().includes("rain") || Math.random() > 0.5;
-        const hasObstacles = file.name.toLowerCase().includes("obstacle") || file.name.toLowerCase().includes("vatcan") || file.name.toLowerCase().includes("cam") || Math.random() > 0.6;
-        
-        setCustomAnalysis({
-          cloudCover: Math.floor(Math.random() * 40) + 40,
-          leafMoisture: isWet ? Math.floor(Math.random() * 30) + 60 : Math.floor(Math.random() * 20) + 15,
-          obstacles: hasObstacles,
-          lightLevel: Math.floor(Math.random() * 30) + 55,
-          confidence: Math.floor(Math.random() * 10) + 88,
-        });
-        notify("Phân tích ảnh trực tiếp hoàn tất!");
-      }, 2500);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-
-    setCustomImageName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setCustomImage(event.target.result);
-      setIsScanning(true);
-      setCustomAnalysis(null);
-
-      setTimeout(() => {
-        setIsScanning(false);
-        const isWet = file.name.toLowerCase().includes("wet") || file.name.toLowerCase().includes("mua") || file.name.toLowerCase().includes("rain") || Math.random() > 0.5;
-        const hasObstacles = file.name.toLowerCase().includes("obstacle") || file.name.toLowerCase().includes("vatcan") || file.name.toLowerCase().includes("cam") || Math.random() > 0.6;
-        
-        setCustomAnalysis({
-          cloudCover: Math.floor(Math.random() * 40) + 40,
-          leafMoisture: isWet ? Math.floor(Math.random() * 30) + 60 : Math.floor(Math.random() * 20) + 15,
-          obstacles: hasObstacles,
-          lightLevel: Math.floor(Math.random() * 30) + 55,
-          confidence: Math.floor(Math.random() * 10) + 88,
-        });
-        notify("Phân tích ảnh trực tiếp hoàn tất!");
-      }, 2500);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const clearCustomImage = () => {
-    setCustomImage(null);
-    setCustomImageName("");
-    setCustomAnalysis(null);
-    setIsScanning(false);
-    notify("Đã đặt lại dữ liệu phân tích hình ảnh.");
+    try {
+      const response = await askChatbot(userMessage.text);
+      const aiMessage = { sender: "ai", text: response.answer ?? "Tôi không nhận được phản hồi phù hợp." };
+      setChatHistory((prev) => [...prev, aiMessage]);
+    } catch (err) {
+      const errorMessage = { sender: "ai", text: `Đã xảy ra lỗi khi gửi tin nhắn: ${err.message}` };
+      setChatHistory((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   const loadDashboard = useCallback(async (showToast = false) => {
     setSyncing(true);
     setError("");
     try {
-      const payload = await getDashboard(locationId);
+      const payload = await getDashboardSlots(locationId, null, farmSize);
       setDashboard(payload);
       setSelectedSlot(0);
       setDroneOpen(false);
-      setOperationTimestamp(payload.current.timestamp);
+      setOperationTimestamp(payload.slots?.[0]?.timestamp || "");
       setDroneState("DOCKED");
       setSprayLocked(false);
       const syncedAt = new Date();
@@ -243,7 +210,7 @@ function App() {
     } finally {
       setSyncing(false);
     }
-  }, [locationId, notify]);
+  }, [locationId, farmSize, notify]);
 
   const executePipelineRefresh = useCallback(async (showToast = true) => {
     setSyncing(true);
@@ -352,19 +319,49 @@ function App() {
     };
   }, [executePipelineRefresh]);
 
-  const current = dashboard?.current;
+  const slots = useMemo(() => {
+    return (dashboard?.slots ?? []).map((slot) => {
+      const time = slot.timestamp?.includes("T") ? slot.timestamp.split("T")[1].substring(0, 5) : "";
+      const hour = time ? Number(time.split(":")[0]) : 0;
+      const end_time = time ? `${(hour + 1).toString().padStart(2, "0")}:00` : "";
+      
+      return {
+        ...slot,
+        time,
+        end_time,
+        temperature: slot.weather?.temperature,
+        wind_speed: slot.weather?.wind_speed,
+        wind_gust: slot.weather?.wind_gust,
+        humidity: slot.weather?.humidity,
+        rain_probability: slot.weather?.precipitation_probability,
+        precipitation: slot.weather?.precipitation,
+        cloud_cover: slot.weather?.cloud_cover,
+        visibility: slot.weather?.visibility,
+        weather_description: slot.weather?.weather_description,
+        evapotranspiration: slot.weather?.evapotranspiration,
+        soil_moisture: slot.weather?.soil_moisture,
+        decision_action: slot.decision_engine?.final_decision,
+        schedule_eligible: slot.decision_engine?.final_decision === "TAKE_OFF",
+        risk_level: slot.decision_engine?.risk_level,
+        recommendation_text: slot.decision_engine?.xai_alert,
+      };
+    });
+  }, [dashboard]);
+
+  const selectedRecommendedSlot = slots[selectedSlot] ?? slots[0] ?? {};
+  const current = selectedRecommendedSlot;
   const action = actionConfig[current?.decision_action] ?? actionConfig.DELAY_FLIGHT;
-  const slots = dashboard?.recommended_slots ?? [];
-  const selectedRecommendedSlot = slots[selectedSlot] ?? slots[0];
-  const canSchedule = Boolean(selectedRecommendedSlot?.schedule_eligible);
+  const canSchedule = Boolean(current?.schedule_eligible);
+
   const timelineTiles = useMemo(
-    () => (dashboard?.timeline_tiles ?? []).map((tile) => ({
+    () => slots.map((tile) => ({
       ...tile,
       tone: actionConfig[tile.decision_action]?.tone ?? "stress",
       label: actionConfig[tile.decision_action]?.short ?? tile.decision_action,
     })),
-    [dashboard],
+    [slots],
   );
+
   const analytics = useMemo(() => buildDashboardAnalytics(dashboard), [dashboard]);
   const operationTile = timelineTiles.find((tile) => tile.timestamp === operationTimestamp) ?? current;
   const operationAction = actionConfig[operationTile?.decision_action] ?? actionConfig.DELAY_FLIGHT;
@@ -373,7 +370,7 @@ function App() {
   const canControlFlight = droneState === "FLYING" || droneState === "SPRAYING";
   const weatherUnsafe = operationTile?.decision_action !== "TAKE_OFF";
   const isSpraying = droneState === "SPRAYING" && !sprayLocked;
-  const countdown = formatCountdown(dashboard?.source.reference_time, nextSafeSlot?.timestamp);
+  const countdown = formatCountdown(dashboard?.date || "", nextSafeSlot?.timestamp);
   const sceneWeather = getSceneWeather(operationTile);
   const sceneStatus = getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sprayLocked });
   const pipelineStatus = syncing
@@ -381,67 +378,23 @@ function App() {
     : pipelineRun
       ? "Dữ liệu mới đã sẵn sàng"
       : "Sẵn sàng cập nhật lại";
+
   const notificationItems = useMemo(
     () => buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt }),
     [dashboard, pipelineRun, syncing, lastSyncedAt],
   );
   const notificationAlertCount = notificationItems.filter((item) => item.tone === "danger" || item.tone === "warning").length;
+
   const recentActivity = useMemo(() => {
-    if (!dashboard || !current) return [];
+    if (!dashboard || !current || !current.time) return [];
     return [
-      { time: current.time, title: action.title, detail: `${dashboard.location.name}: ${translateWeatherDescription(current.weather_description)}`, tone: action.tone === "healthy" ? "success" : "warning" },
-      { time: current.time, title: "Đã tính mức phun đề xuất", detail: `Mức đề xuất: ${current.dynamic_flow_rate_pct}% theo điều kiện hiện tại`, tone: "success" },
-      { time: slots[0]?.time ?? "--:--", title: "Đã tìm khung giờ vận hành phù hợp", detail: slots[0] ? `${slots[0].time} - ${slots[0].end_time}, điểm bay ${slots[0].flyability_score}/100` : "Chưa có khung giờ phù hợp", tone: "success" },
+      { time: current.time, title: action.title, detail: `${dashboard.location}: ${translateWeatherDescription(current.weather_description)}`, tone: action.tone === "healthy" ? "success" : "warning" },
+      { time: current.time, title: "Đã tính mức phun đề xuất", detail: `Mức đề xuất: ${current.decision_engine?.resource_regressor?.flow_rate_l_ha || 0} L/ha theo điều kiện hiện tại`, tone: "success" },
+      { time: slots[0]?.time ?? "--:--", title: "Đã tìm khung giờ vận hành phù hợp", detail: slots[0] ? `${slots[0].time} - ${slots[0].end_time}, mức rủi ro ${translateRiskLevel(slots[0].risk_level).toLowerCase()}` : "Chưa có khung giờ phù hợp", tone: "success" },
     ];
   }, [action, current, dashboard, slots]);
 
-  const targetSlot = selectedRecommendedSlot ?? current ?? {};
-
-  const combinedDecision = useMemo(() => {
-    if (!targetSlot) return null;
-    
-    let actionKey = targetSlot.decision_action;
-    let flowRate = targetSlot.dynamic_flow_rate_pct;
-    let explanation = "Khuyến nghị được tính toán tự động dựa trên các thông số thời tiết thời gian thực từ Weather API.";
-    let details = [];
-
-    if (customAnalysis) {
-      const { cloudCover, leafMoisture, obstacles, lightLevel } = customAnalysis;
-      explanation = "Quyết định kết hợp giữa dữ liệu Weather API và kết quả phân tích thị giác máy tính (Computer Vision) từ hình ảnh UAV tải lên.";
-      
-      if (leafMoisture > 50) {
-        actionKey = "LOCK_SPRAY";
-        flowRate = 0;
-        details.push(`Lá ướt mức độ cao (${leafMoisture}%) phát hiện bởi AI Camera -> Cường chế KHÓA PHUN để tránh trôi dạt hóa chất.`);
-      } else if (obstacles) {
-        actionKey = "DELAY_FLIGHT";
-        flowRate = 0;
-        details.push(`Phát hiện vật cản hoặc nguy hiểm trong hành lang bay -> Đề xuất HOÃN CHUYẾN BAY để đảm bảo an toàn thiết bị.`);
-      } else if (cloudCover > 70 && targetSlot.rain_probability > 40) {
-        actionKey = "DELAY_FLIGHT";
-        flowRate = Math.max(0, flowRate - 20);
-        details.push(`Độ che phủ mây dày (${cloudCover}%) kết hợp xác suất mưa cao (${targetSlot.rain_probability}%) -> Khuyên HOÃN BAY hoặc giảm mức phun.`);
-      } else {
-        if (lightLevel < 30) {
-          details.push(`Ánh sáng môi trường yếu (${lightLevel}%) -> UAV tự động kích hoạt chế độ camera đêm.`);
-        }
-        if (cloudCover > 50) {
-          details.push(`Mây che phủ trung bình (${cloudCover}%) -> Giữ mức phun ổn định.`);
-        }
-        details.push(`Không phát hiện vật cản hoặc độ ẩm lá bất thường. Giữ nguyên khuyến nghị cất cánh.`);
-      }
-    }
-
-    const actionObj = actionConfig[actionKey] ?? actionConfig.DELAY_FLIGHT;
-    return {
-      actionKey,
-      action: actionObj,
-      flowRate,
-      explanation,
-      details,
-      isOverridden: Boolean(customAnalysis)
-    };
-  }, [targetSlot, customAnalysis]);
+  const targetSlot = selectedRecommendedSlot;
 
   if (!dashboard && error) {
     return <ErrorScreen error={error} retry={() => loadDashboard()} />;
@@ -573,13 +526,15 @@ function App() {
     { label: "Tốc độ gió", value: targetSlot.wind_speed, unit: " km/h", icon: Wind, tone: "blue", note: `Gió giật ${formatNumber(targetSlot.wind_gust)} km/h` },
     { label: "Độ ẩm", value: targetSlot.humidity, unit: "%", icon: Droplets, tone: "cyan", note: `Mây ${formatNumber(targetSlot.cloud_cover)}% · Tầm nhìn ${visibilityText}` },
     { label: "Khả năng mưa", value: targetSlot.rain_probability, unit: "%", icon: CloudRain, tone: "purple", note: precipitationText },
+    { label: "Bốc hơi nước", value: targetSlot.evapotranspiration != null ? formatNumber(targetSlot.evapotranspiration) : "--", unit: " ET₀", icon: Droplets, tone: "emerald", note: `Chỉ số bốc hơi nước vi khí hậu` },
+    { label: "Độ ẩm đất", value: targetSlot.soil_moisture != null ? formatNumber(targetSlot.soil_moisture) : "--", unit: "%", icon: Gauge, tone: "lime", note: `Độ ẩm tầng đất 0-7cm` },
   ];
   const activeDecisionConfig = decisionConfig ?? dashboard.decision_config;
   const ruleSourceLabel = activeDecisionConfig?.source === "file" ? "Đang dùng cấu hình giao diện" : "Đang dùng cấu hình mặc định";
   const unsafeWeatherCodeCount = activeDecisionConfig?.unsafe_weather_codes?.length ?? 0;
 
-  const activeAction = combinedDecision?.action ?? action;
-  const activeRisk = activeAction?.risk ?? "Thấp";
+  const activeAction = action;
+  const activeRisk = translateRiskLevel(current?.risk_level ?? "LOW");
 
   return (
     <div className="min-h-screen bg-[#060b09] text-slate-200 font-sans pb-12 antialiased selection:bg-emerald-500/30 selection:text-emerald-300">
@@ -731,13 +686,15 @@ function App() {
               </div>
 
               {/* Consolidated Weather Metrics Row */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-2">
                 {weatherMetrics.map(({ label, value, unit, icon: Icon, tone, note }) => {
                   const toneColors = {
                     orange: "bg-orange-500/10 text-orange-400 border-orange-500/20",
                     blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
                     cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
-                    purple: "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                    purple: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+                    emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                    lime: "bg-lime-500/10 text-lime-400 border-lime-500/20"
                   };
                   return (
                     <div className={`p-4 rounded-xl border ${toneColors[tone] ?? "bg-slate-900 border-slate-800"}`} key={label}>
@@ -753,245 +710,233 @@ function App() {
               </div>
             </section>
 
-            {/* Row 2: AI Decision Engine & AI Vision Demo */}
+            {/* Row 2: AI Decision Engine & Resource Estimator */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Decision Output & AI Model Comparison */}
-              <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col justify-between gap-5">
-                <div>
-                  <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3 mb-4">
-                    <div>
-                      <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Trạng thái Khuyến nghị</span>
-                      <h3 className="text-base font-bold text-slate-100 mt-0.5">Decision Engine Output</h3>
+              {/* Left Column: Decision Output & XAI Banner */}
+              <div className="flex flex-col gap-4">
+                <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex-1 flex flex-col justify-between gap-5">
+                  <div>
+                    <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3 mb-4">
+                      <div>
+                        <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Trạng thái Khuyến nghị</span>
+                        <h3 className="text-base font-bold text-slate-100 mt-0.5">Decision Engine Output</h3>
+                      </div>
+                      <span className="text-xs text-slate-400 bg-[#0e1c16] px-2.5 py-1 rounded-lg border border-[#173327] font-semibold">
+                        v2.0
+                      </span>
                     </div>
-                    <span className="text-xs text-slate-400 bg-[#0e1c16] px-2.5 py-1 rounded-lg border border-[#173327]">
-                      v1.0
-                    </span>
+
+                    {/* Giant Recommendation Card */}
+                    <div className={`border p-4 rounded-xl relative overflow-hidden shadow-lg transition duration-300 ${
+                      current?.decision_action === "TAKE_OFF"
+                        ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-100"
+                        : current?.decision_action === "DELAY_FLIGHT"
+                        ? "bg-amber-950/20 border-amber-500/30 text-amber-100"
+                        : "bg-red-950/20 border-red-500/30 text-red-100"
+                    }`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2.5 h-2.5 rounded-full flex items-center justify-center border animate-pulse ${
+                            current?.decision_action === "TAKE_OFF"
+                              ? "bg-emerald-500 border-emerald-300"
+                              : current?.decision_action === "DELAY_FLIGHT"
+                              ? "bg-amber-500 border-amber-300"
+                              : "bg-red-500 border-red-300"
+                          }`}></span>
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                            Khuyến nghị tự động từ hệ thống
+                          </span>
+                        </div>
+                        <div className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                          current?.decision_action === "TAKE_OFF"
+                            ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-400"
+                            : current?.decision_action === "DELAY_FLIGHT"
+                            ? "bg-amber-950/40 border-amber-500/40 text-amber-400"
+                            : "bg-red-950/40 border-red-500/40 text-red-400"
+                        }`}>
+                          Rủi ro: {activeRisk}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex justify-between items-center gap-3">
+                        <div>
+                          <h4 className="text-lg font-bold tracking-tight mb-1">{action.title}</h4>
+                          <p className="text-xs text-slate-300 leading-normal">
+                            {action.description}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 text-center bg-black/40 border border-slate-800 rounded-xl px-3 py-2 min-w-[100px]">
+                          <small className="text-xs text-slate-400 font-bold uppercase block">Định mức phun</small>
+                          <strong className="text-lg font-black text-emerald-400 font-mono">
+                            {formatNumber(current?.decision_engine?.resource_regressor?.flow_rate_l_ha ?? 0)}
+                          </strong>
+                          <span className="text-xs text-slate-400 block font-semibold">L/ha</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* XAI Alert Banner */}
+                    {current?.decision_action !== "TAKE_OFF" && current?.decision_engine?.xai_alert && (
+                      <div className={`p-4 rounded-xl border flex items-start gap-3 mt-4 ${
+                        current?.decision_engine?.risk_level === "HIGH" 
+                          ? "bg-red-950/30 border-red-500/30 text-red-200" 
+                          : "bg-amber-950/30 border-amber-500/30 text-amber-200"
+                      }`}>
+                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                          current?.decision_engine?.risk_level === "HIGH" ? "bg-red-900/40 text-red-400" : "bg-amber-900/40 text-amber-400"
+                        }`}>
+                          <CircleAlert size={16} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-bold uppercase tracking-wider">
+                            Giải thích Quyết định AI (XAI Banner)
+                          </span>
+                          <p className="text-xs font-medium leading-relaxed font-mono">
+                            {current?.decision_engine?.xai_alert}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              {/* Right Column: Dual-ML & Resource Estimations */}
+              <div className="flex flex-col gap-4">
+                
+                {/* Dual-ML Model Comparison (Champion vs Challenger) */}
+                <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
+                  <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3">
+                    <div>
+                      <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">So sánh Mô hình AI</span>
+                      <h3 className="text-base font-bold text-slate-100 mt-0.5">Dual-ML AI Prediction</h3>
+                    </div>
                   </div>
 
-                  {/* Giant Recommendation Card */}
-                  <div className={`border p-4 rounded-xl relative overflow-hidden shadow-lg transition duration-300 ${
-                    combinedDecision?.actionKey === "TAKE_OFF"
-                      ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-100"
-                      : combinedDecision?.actionKey === "DELAY_FLIGHT"
-                      ? "bg-amber-950/20 border-amber-500/30 text-amber-100"
-                      : "bg-red-950/20 border-red-500/30 text-red-100"
-                  }`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-2.5 h-2.5 rounded-full flex items-center justify-center border animate-pulse ${
-                          combinedDecision?.actionKey === "TAKE_OFF"
-                            ? "bg-emerald-500 border-emerald-300"
-                            : combinedDecision?.actionKey === "DELAY_FLIGHT"
-                            ? "bg-amber-500 border-amber-300"
-                            : "bg-red-500 border-red-300"
-                        }`}></span>
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                          {combinedDecision?.isOverridden ? "Khuyến nghị kết hợp AI" : "Khuyến nghị từ Quy tắc"}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Champion Model */}
+                    <div className="p-3 bg-slate-900/30 border border-slate-800/40 rounded-xl flex flex-col gap-2">
+                      <span className="text-xs font-bold text-slate-400">Champion: Random Forest</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-semibold text-slate-200">
+                          {translatePrediction(current?.decision_engine?.champion_prediction)}
+                        </span>
+                        <span className="text-xs font-extrabold text-emerald-400 font-mono">
+                          {current?.decision_engine?.champion_confidence != null ? Math.round(current.decision_engine.champion_confidence * 100) : 0}%
                         </span>
                       </div>
-                      <div className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
-                        combinedDecision?.actionKey === "TAKE_OFF"
-                          ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-400"
-                          : combinedDecision?.actionKey === "DELAY_FLIGHT"
-                          ? "bg-amber-950/40 border-amber-500/40 text-amber-400"
-                          : "bg-red-950/40 border-red-500/40 text-red-400"
-                      }`}>
-                        Rủi ro: {activeRisk}
+                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${current?.decision_engine?.champion_confidence != null ? Math.round(current.decision_engine.champion_confidence * 100) : 0}%` }}
+                        ></div>
                       </div>
                     </div>
 
-                    <div className="mt-3 flex justify-between items-center gap-3">
-                      <div>
-                        <h4 className="text-lg font-bold tracking-tight mb-1">{activeAction.title}</h4>
-                        <p className="text-xs text-slate-300 leading-normal">
-                          {activeAction.description}
+                    {/* Challenger Model */}
+                    <div className="p-3 bg-slate-900/30 border border-slate-800/40 rounded-xl flex flex-col gap-2">
+                      <span className="text-xs font-bold text-slate-400">Challenger: XGBoost</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-semibold text-slate-200">
+                          {translatePrediction(current?.decision_engine?.challenger_prediction)}
+                        </span>
+                        <span className="text-xs font-extrabold text-blue-400 font-mono">
+                          {current?.decision_engine?.challenger_confidence != null ? Math.round(current.decision_engine.challenger_confidence * 100) : 0}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                        <div 
+                          className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${current?.decision_engine?.challenger_confidence != null ? Math.round(current.decision_engine.challenger_confidence * 100) : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Consensus / Conflict Alert */}
+                  {current?.decision_engine?.was_conflict && (
+                    <div className="p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-start gap-2 text-amber-200">
+                      <CircleAlert size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider">Cảnh báo: Có sự xung đột quyết định</span>
+                        <p className="text-xs font-medium">
+                          Hệ thống đã tự động giải quyết xung đột bằng thuật toán đồng thuận an toàn.
                         </p>
                       </div>
-                      <div className="flex-shrink-0 text-center bg-black/40 border border-slate-800 rounded-xl px-3 py-2 min-w-[80px]">
-                        <small className="text-xs text-slate-400 font-bold uppercase block">Mức phun</small>
-                        <strong className="text-2xl font-black text-emerald-400 font-mono">{combinedDecision?.flowRate}%</strong>
-                      </div>
+                    </div>
+                  )}
+                </section>
+
+                {/* Resource Regressor Panel */}
+                <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
+                  <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3">
+                    <div>
+                      <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Ước tính tài nguyên</span>
+                      <h3 className="text-base font-bold text-slate-100 mt-0.5">DJI Agras T30 Estimator</h3>
                     </div>
                   </div>
 
-                  {/* AI Explanation Banner */}
-                  <div className="mt-4 p-4 bg-[#09100e]/90 border border-[#142820]/30 rounded-xl flex flex-col gap-2 shadow-inner">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                      <Bot size={15} /> Phân tích & Giải thích từ AI
-                    </div>
-                    
-                    <p className="text-xs text-slate-300 leading-relaxed font-medium">
-                      {combinedDecision?.explanation}
-                    </p>
-
-                    {combinedDecision?.details && combinedDecision.details.length > 0 && (
-                      <div className="flex flex-col gap-1 border-t border-[#142820]/20 pt-2 mt-1">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Yếu tố điều chỉnh AI (Computer Vision):</span>
-                        {combinedDecision.details.map((detail, idx) => (
-                          <div key={idx} className="text-xs text-emerald-400 flex items-start gap-1">
-                            <span className="text-emerald-500 font-bold">•</span>
-                            <span>{detail}</span>
-                          </div>
-                        ))}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-300 font-medium">Quy mô canh tác (hecta)</span>
+                      <div className="flex items-center gap-1">
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="100" 
+                          step="0.5"
+                          value={farmSize}
+                          onChange={(e) => setFarmSize(Math.max(1, parseFloat(e.target.value) || 1))}
+                          className="w-16 bg-slate-900 border border-slate-800 text-slate-100 font-bold font-mono text-center rounded py-0.5 focus:border-emerald-500 focus:outline-none"
+                        />
+                        <span className="text-slate-400">ha</span>
                       </div>
-                    )}
-
-                    {targetSlot?.recommendation_text && (
-                      <div className="text-xs text-slate-400 border-t border-[#142820]/20 pt-2 mt-1 leading-normal">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Cơ sở dữ liệu thời tiết (Weather Rules):</span>
-                        <span className="font-mono text-slate-300">{targetSlot.recommendation_text}</span>
-                      </div>
-                    )}
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      step="0.5"
+                      value={farmSize}
+                      onChange={(e) => setFarmSize(parseFloat(e.target.value))}
+                      className="w-full accent-emerald-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
+                    />
                   </div>
-                </div>
 
-                {/* Model Comparison */}
-                <div className="flex flex-col gap-2.5 pt-3 border-t border-[#142820]/30">
-                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">
-                    Đánh giá & So sánh mô hình AI
-                  </span>
-                  
-                  {aiTraining?.metrics?.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2">
-                      {aiTraining.metrics.map((metric) => {
-                        const isDT = metric.model === "decision_tree";
-                        return (
-                          <div 
-                            className={`p-2.5 rounded-lg border transition-all duration-300 flex justify-between items-center ${
-                              isDT 
-                                ? "bg-[#0c1a15] border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.06)] opacity-100" 
-                                : "bg-slate-900/10 border-slate-800/20 opacity-40 hover:opacity-75"
-                            }`}
-                            key={metric.model}
-                          >
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-slate-200">{formatModelName(metric.model)}</span>
-                                {isDT && (
-                                  <span className="bg-emerald-500/20 text-emerald-400 text-xs font-extrabold px-1.5 py-0.5 rounded border border-emerald-500/30 tracking-wider uppercase">
-                                    Best
-                                  </span>
-                                )}
-                              </div>
-                              <small className="text-xs text-slate-500 mt-0.5">
-                                Macro F1: {formatNumber((Number(metric.macro_f1) || 0) * 100)}%
-                              </small>
-                            </div>
-                            <strong className="text-xs text-emerald-400 font-bold font-mono">
-                              {formatNumber((Number(metric.accuracy) || 0) * 100)}% đúng
-                            </strong>
-                          </div>
-                        );
-                      })}
+                  <div className="grid grid-cols-2 gap-3 border-t border-[#142820]/20 pt-3">
+                    <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-lg">
+                      <span className="text-xs text-slate-500 font-bold uppercase block">Định mức phun</span>
+                      <strong className="text-base font-extrabold text-slate-200 font-mono">
+                        {formatNumber(current?.decision_engine?.resource_regressor?.flow_rate_l_ha ?? 0)}
+                      </strong>
+                      <span className="text-xs text-slate-400 ml-1">L/ha</span>
                     </div>
-                  ) : (
-                    <div className="text-center py-4 text-xs text-slate-500">
-                      Chưa có kết quả đánh giá mô hình.
+                    <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-lg">
+                      <span className="text-xs text-slate-500 font-bold uppercase block">Tổng hóa chất</span>
+                      <strong className="text-base font-extrabold text-emerald-400 font-mono">
+                        {formatNumber(current?.decision_engine?.resource_regressor?.total_liters ?? 0)}
+                      </strong>
+                      <span className="text-xs text-slate-400 ml-1">Lít</span>
                     </div>
-                  )}
-                </div>
-              </section>
-
-              {/* AI Vision Lab (Demo Area) */}
-              <div className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col gap-4">
-                <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3">
-                  <div>
-                    <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Nhận diện hiện trường (Demo)</span>
-                    <h3 className="text-base font-bold text-slate-100 mt-0.5">AI Vision Lab - Nhận diện hiện trường</h3>
+                    <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-lg">
+                      <span className="text-xs text-slate-500 font-bold uppercase block">Số chuyến bay (Sorties)</span>
+                      <strong className="text-base font-extrabold text-slate-200 font-mono">
+                        {current?.decision_engine?.resource_regressor?.sorties ?? 0}
+                      </strong>
+                      <span className="text-xs text-slate-400 ml-1">chuyến</span>
+                    </div>
+                    <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-lg">
+                      <span className="text-xs text-slate-500 font-bold uppercase block">Chu kỳ pin</span>
+                      <strong className="text-base font-extrabold text-slate-200 font-mono">
+                        {current?.decision_engine?.resource_regressor?.battery_cycles ?? 0}
+                      </strong>
+                      <span className="text-xs text-slate-400 ml-1">chu kỳ</span>
+                    </div>
                   </div>
-                  {customImage && (
-                    <button 
-                      onClick={clearCustomImage} 
-                      className="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1.5 transition"
-                    >
-                      <X size={14} /> Xóa ảnh
-                    </button>
-                  )}
-                </div>
-
-                {/* Drag-and-Drop Area */}
-                <div 
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                  className="relative border-2 border-dashed border-slate-700/60 hover:border-emerald-500/50 rounded-2xl h-[260px] flex flex-col items-center justify-center overflow-hidden transition bg-black/20 group"
-                >
-                  {!customImage ? (
-                    <label className="cursor-pointer flex flex-col items-center justify-center p-6 text-center w-full h-full">
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleCustomImageUpload} 
-                        className="hidden" 
-                      />
-                      <Upload className="w-10 h-10 text-slate-400 group-hover:text-emerald-400 transition mb-3" />
-                      <span className="text-sm font-semibold text-slate-200 group-hover:text-slate-100 transition">Kéo thả ảnh hoặc click để tải lên</span>
-                      <span className="text-xs text-slate-500 mt-1.5">Mô phỏng nguồn camera phụ UAV</span>
-                    </label>
-                  ) : (
-                    <div className="relative w-full h-full flex items-center justify-center p-2">
-                      <img 
-                        src={customImage} 
-                        alt="UAV Uploaded Capture" 
-                        className="max-h-full max-w-full rounded-lg object-contain"
-                      />
-
-                      {/* Scanning Laser Animation */}
-                      {isScanning && (
-                        <div className="absolute inset-x-2 top-2 bottom-2 overflow-hidden pointer-events-none rounded-lg">
-                          <motion.div 
-                            className="w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#10b981]"
-                            initial={{ y: 0 }}
-                            animate={{ y: [0, 240, 0] }}
-                            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                          />
-                          <div className="absolute inset-0 bg-emerald-500/5 flex items-center justify-center">
-                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest bg-black/60 px-3 py-1.5 rounded-full border border-emerald-500/30 animate-pulse">
-                              AI Scanning...
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Bounding Boxes and Analysis Output overlay */}
-                      {!isScanning && customAnalysis && (
-                        <div className="absolute inset-2 pointer-events-none">
-                          {/* Cloud cover bounding box */}
-                          <div className="absolute top-[10%] left-[10%] w-[35%] h-[25%] border-2 border-dashed border-sky-400/80 rounded-lg p-1.5 flex flex-col justify-between">
-                            <span className="bg-sky-500/80 text-white font-mono text-xs font-bold px-1 py-0.5 rounded w-fit uppercase tracking-wider">
-                              Cloud: {customAnalysis.cloudCover}%
-                            </span>
-                          </div>
-
-                          {/* Leaf moisture indicator (wet leaves) */}
-                          {customAnalysis.leafMoisture > 50 && (
-                            <div className="absolute bottom-[10%] right-[10%] w-[45%] h-[35%] border-2 border-dashed border-emerald-500/80 rounded-lg p-1.5 flex flex-col justify-between">
-                              <span className="bg-emerald-500/80 text-white font-mono text-xs font-bold px-1 py-0.5 rounded w-fit uppercase tracking-wider">
-                                Leaf Wetness: {customAnalysis.leafMoisture}%
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Obstacles detected */}
-                          {customAnalysis.obstacles && (
-                            <div className="absolute top-[35%] left-[40%] w-[25%] h-[30%] border-2 border-dashed border-red-500/80 rounded-lg p-1.5 flex flex-col justify-between animate-pulse">
-                              <span className="bg-red-500/80 text-white font-mono text-xs font-bold px-1 py-0.5 rounded w-fit uppercase tracking-wider">
-                                Obstacle Detected
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Confidence score badge */}
-                          <div className="absolute bottom-2 left-2 pointer-events-auto bg-black/80 border border-slate-700/60 rounded-xl px-2 py-0.5 text-slate-300 text-xs flex items-center gap-1.5 shadow-md">
-                            <Check className="w-3 h-3 text-emerald-400" />
-                            <span>Confidence: <b>{customAnalysis.confidence}%</b></span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                </section>
               </div>
+
             </div>
 
             {/* Row 3: Simulated KPIs (Executive Output) */}
@@ -1000,7 +945,7 @@ function App() {
                 <Gauge size={16} className="text-emerald-500" /> KPI mô phỏng của bộ khuyến nghị vận hành
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {dashboard.kpis.map((kpi) => (
+                {localKpis.map((kpi) => (
                   <article className="bg-[#0b1210]/95 border border-[#142820]/40 p-4 rounded-xl flex flex-col justify-between" key={kpi.key}>
                     <div>
                       <span className="text-slate-400 text-xs font-medium">{kpi.label}</span>
@@ -1015,7 +960,7 @@ function App() {
                   </article>
                 ))}
               </div>
-              <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5"><CircleAlert size={14} /> {dashboard.backtesting_note}</p>
+              <p className="text-xs text-slate-500 mt-3 flex items-center gap-1.5"><CircleAlert size={14} /> {dashboard.backtesting_note ?? "Hệ thống tự động lưu trữ và đánh giá hiệu năng dựa trên dữ liệu lịch sử bay."}</p>
             </section>
           </div>
 
@@ -1098,13 +1043,105 @@ function App() {
       <AnimatePresence>
         {toast && (
           <motion.div 
-            className="fixed bottom-6 right-6 z-50 bg-[#162521] border border-emerald-500/30 text-emerald-300 font-semibold text-xs py-3 px-4 rounded-xl shadow-2xl flex items-center gap-2"
+            className="fixed bottom-6 left-6 z-50 bg-[#162521] border border-emerald-500/30 text-emerald-300 font-semibold text-xs py-3 px-4 rounded-xl shadow-2xl flex items-center gap-2"
             initial={{ opacity: 0, y: 18 }} 
             animate={{ opacity: 1, y: 0 }} 
             exit={{ opacity: 0, y: 12 }}
           >
             <Check size={14} className="text-emerald-400" />
             <span>{toast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating AI Chatbot Toggle Button */}
+      <button 
+        onClick={() => setChatOpen(!chatOpen)}
+        className="fixed bottom-6 right-6 z-40 bg-emerald-600 hover:bg-emerald-500 text-white p-3.5 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center border border-emerald-400/30"
+      >
+        {chatOpen ? <X size={20} /> : <Bot size={20} />}
+      </button>
+
+      {/* Floating Chat Box Panel */}
+      <AnimatePresence>
+        {chatOpen && (
+          <motion.div 
+            className="fixed bottom-24 right-6 z-40 w-96 max-w-[calc(100vw-32px)] bg-[#0d1613]/95 border border-[#142820]/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[480px] backdrop-blur-md"
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+          >
+            {/* Chat Header */}
+            <div className="bg-[#0b1713] px-4 py-3 border-b border-[#142d22] flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-700/50 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Bot size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-100 uppercase tracking-wider">Hỏi đáp Lịch sử Bay</h4>
+                  <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Trực tuyến
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setChatOpen(false)} className="text-slate-400 hover:text-slate-200 transition">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Chat History */}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 scrollbar-thin scrollbar-thumb-emerald-800 scrollbar-track-transparent">
+              {chatHistory.map((msg, index) => {
+                const isAi = msg.sender === "ai";
+                return (
+                  <div key={index} className={`flex ${isAi ? "justify-start" : "justify-end"}`}>
+                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                      isAi 
+                        ? "bg-slate-900/60 border border-slate-800/80 text-slate-200" 
+                        : "bg-emerald-600 text-white font-medium"
+                    }`}>
+                      {isAi ? (
+                        <div 
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }} 
+                          className="prose prose-invert max-w-none text-xs"
+                        />
+                      ) : (
+                        msg.text
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-400 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-bounce [animation-delay:0.4s]"></span>
+                    <span>AI đang phân tích...</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input */}
+            <form onSubmit={handleSendChatMessage} className="p-3 bg-[#0b1713] border-t border-[#142d22] flex gap-2">
+              <input 
+                type="text" 
+                placeholder="Hỏi về lịch sử bay, lý do cấm..." 
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                disabled={isChatLoading}
+                className="flex-1 bg-slate-950 border border-slate-800/80 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+              <button 
+                type="submit" 
+                disabled={isChatLoading || !chatInput.trim()}
+                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center"
+              >
+                Gửi
+              </button>
+            </form>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1593,11 +1630,31 @@ function getSceneStatus({ droneState, nextSafeSlot, countdown, weatherUnsafe, sp
 }
 
 function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt }) {
-  if (!dashboard?.current) return [];
+  if (!dashboard?.slots?.length) return [];
 
-  const current = dashboard.current;
-  const forecast = dashboard.forecast ?? [];
-  const recommendedSlots = dashboard.recommended_slots ?? [];
+  const slots = dashboard.slots.map((slot) => {
+    const time = slot.timestamp?.includes("T") ? slot.timestamp.split("T")[1].substring(0, 5) : "";
+    return {
+      ...slot,
+      time,
+      temperature: slot.weather?.temperature,
+      wind_speed: slot.weather?.wind_speed,
+      wind_gust: slot.weather?.wind_gust,
+      humidity: slot.weather?.humidity,
+      rain_probability: slot.weather?.precipitation_probability,
+      precipitation: slot.weather?.precipitation,
+      cloud_cover: slot.weather?.cloud_cover,
+      visibility: slot.weather?.visibility,
+      weather_description: slot.weather?.weather_description,
+      decision_action: slot.decision_engine?.final_decision,
+      schedule_eligible: slot.decision_engine?.final_decision === "TAKE_OFF",
+      risk_level: slot.decision_engine?.risk_level,
+    };
+  });
+
+  const current = slots[0];
+  const forecast = slots;
+  const recommendedSlots = slots.filter((slot) => slot.schedule_eligible);
   const action = actionConfig[current.decision_action] ?? actionConfig.DELAY_FLIGHT;
   const notifications = [
     {
@@ -1605,7 +1662,7 @@ function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt 
       icon: current.decision_action === "TAKE_OFF" ? Check : ShieldAlert,
       tone: current.decision_action === "TAKE_OFF" ? "success" : "warning",
       title: action.title,
-      detail: `${dashboard.location.name}: điểm bay ${formatNumber(current.flyability_score)}/100, rủi ro ${translateRiskLevel(current.risk_level).toLowerCase()}.`,
+      detail: `${dashboard.location}: mức rủi ro ${translateRiskLevel(current.risk_level).toLowerCase()}.`,
       time: current.time,
     },
   ];
@@ -1656,26 +1713,26 @@ function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSyncedAt 
     });
   }
 
-  const safeSlot = recommendedSlots.find((slot) => slot.schedule_eligible);
+  const safeSlot = recommendedSlots[0];
   notifications.push({
     id: safeSlot ? `safe-${safeSlot.timestamp}` : "safe-missing",
     icon: safeSlot ? CalendarDays : Lock,
     tone: safeSlot ? "success" : "danger",
     title: safeSlot ? "Có khung giờ cất cánh đề xuất" : "Chưa có khung giờ cất cánh",
     detail: safeSlot
-      ? `${safeSlot.time} - ${safeSlot.end_time}, điểm bay ${formatNumber(safeSlot.flyability_score)}/100.`
+      ? `${safeSlot.time} - ${safeSlot.end_time}, mức rủi ro ${translateRiskLevel(safeSlot.risk_level).toLowerCase()}.`
       : "Hệ thống chưa tìm thấy khung giờ đủ an toàn trong dữ liệu hiện tại.",
     time: safeSlot?.time ?? current.time,
   });
 
   notifications.push({
-    id: syncing ? "pipeline-running" : `source-${dashboard.source.updated_at}`,
+    id: syncing ? "pipeline-running" : `source-${dashboard.source}`,
     icon: syncing ? RefreshCw : Radio,
     tone: syncing ? "info" : "success",
     title: syncing ? "Đang đồng bộ dữ liệu" : "Nguồn dữ liệu đã sẵn sàng",
     detail: syncing
       ? "Hệ thống đang lấy và làm sạch dự báo mới."
-      : `${dashboard.source.dataset} · cập nhật ${formatDateTime(dashboard.source.updated_at)}.`,
+      : `${dashboard.source || "Dữ liệu thời tiết"}.`,
     time: lastSyncedAt ? `Giao diện: ${formatDateTime(lastSyncedAt)}` : "",
   });
 
@@ -1717,8 +1774,26 @@ function getSceneWeather(slot) {
 }
 
 function buildDashboardAnalytics(dashboard) {
-  const rows = (dashboard?.timeline_tiles?.length ? dashboard.timeline_tiles : dashboard?.forecast ?? []).slice(0, 12);
-  const scores = rows.map((row) => Number(row.flyability_score) || 0);
+  const rows = (dashboard?.slots ?? []).slice(0, 12).map((slot) => {
+    const time = slot.timestamp?.includes("T") ? slot.timestamp.split("T")[1].substring(0, 5) : "";
+    return {
+      ...slot,
+      time,
+      temperature: slot.weather?.temperature,
+      wind_speed: slot.weather?.wind_speed,
+      wind_gust: slot.weather?.wind_gust,
+      humidity: slot.weather?.humidity,
+      rain_probability: slot.weather?.precipitation_probability,
+      precipitation: slot.weather?.precipitation,
+      cloud_cover: slot.weather?.cloud_cover,
+      visibility: slot.weather?.visibility,
+      weather_description: slot.weather?.weather_description,
+      decision_action: slot.decision_engine?.final_decision,
+      schedule_eligible: slot.decision_engine?.final_decision === "TAKE_OFF",
+      risk_level: slot.decision_engine?.risk_level,
+    };
+  });
+
   const winds = rows.map((row) => Number(row.wind_speed) || 0);
   const rains = rows.map((row) => Number(row.rain_probability) || 0);
   const temps = rows.map((row) => Number(row.temperature) || 0);
@@ -1729,9 +1804,9 @@ function buildDashboardAnalytics(dashboard) {
     rows,
     actionSegments,
     summary: [
-      { label: "Mốc dự báo nhận được", value: rows.length, suffix: " mốc", note: dashboard?.source?.dataset ?? "Đang chờ dữ liệu" },
+      { label: "Mốc dự báo nhận được", value: rows.length, suffix: " mốc", note: dashboard?.source ?? "Đang chờ dữ liệu" },
       { label: "Khung giờ bay an toàn", value: safeSlots, suffix: `/${rows.length}`, note: `${formatNumber((safeSlots / Math.max(rows.length, 1)) * 100)}% khung giờ cất cánh` },
-      { label: "Điểm bay trung bình", value: formatNumber(average(scores)), suffix: "/100", note: `Cao nhất ${formatNumber(Math.max(...scores, 0))}/100` },
+      { label: "Điểm bay trung bình", value: safeSlots ? "Tốt" : "Hạn chế", suffix: "", note: "Ước tính từ các mô hình AI" },
       { label: "Điều kiện nổi bật", value: formatNumber(Math.max(...rains, 0)), suffix: "% mưa", note: `Gió TB ${formatNumber(average(winds))} km/h · Nhiệt TB ${formatNumber(average(temps))}°C` },
     ],
   };
@@ -1745,7 +1820,8 @@ function buildActionSegments(rows) {
     RETURN_TO_CHARGING: "#4f8ca9",
   };
   const counts = rows.reduce((totals, row) => {
-    totals[row.decision_action] = (totals[row.decision_action] ?? 0) + 1;
+    const act = row.decision_action || "DELAY_FLIGHT";
+    totals[act] = (totals[act] ?? 0) + 1;
     return totals;
   }, {});
   return Object.entries(counts).map(([key, count]) => ({
@@ -1807,6 +1883,40 @@ function formatDateTimeWithSeconds(value) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function translatePrediction(pred) {
+  if (!pred) return "--";
+  const mapping = {
+    TAKE_OFF: "CẤT CÁNH",
+    DELAY_FLIGHT: "HOÃN BAY",
+    LOCK_SPRAY: "KHÓA PHUN",
+    RETURN_TO_CHARGING: "VỀ TRẠM SẠC",
+  };
+  return mapping[pred] ?? pred;
+}
+
+function renderMarkdown(text) {
+  if (!text) return "";
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  
+  // Bold: **text**
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  
+  // Bullet points: - item
+  html = html.split("\n").map(line => {
+    if (line.trim().startsWith("- ")) {
+      return `<li class="ml-4 list-disc text-xs mt-1">${line.trim().substring(2)}</li>`;
+    }
+    return line;
+  }).join("\n");
+  
+  // Line breaks
+  html = html.replace(/\n/g, "<br />");
+  return html;
 }
 
 function formatModelName(value) {
@@ -1879,14 +1989,6 @@ function formatVisibility(value) {
   return `${formatNumber(meters)} m`;
 }
 
-function translateRiskLevel(level) {
-  const labels = {
-    LOW: "Thấp",
-    MEDIUM: "Trung bình",
-    HIGH: "Cao",
-  };
-  return labels[level] ?? level ?? "--";
-}
 
 function translateWeatherDescription(description) {
   if (!description) return "Điều kiện ổn định";
@@ -2021,6 +2123,8 @@ function WeatherChart({ forecast = [], selectedTimestamp, onSelect }) {
           <span>{formatNumber(activeSlot.temperature)}°C</span>
           <span><Wind size={12} /> Gió {formatNumber(activeSlot.wind_speed)} km/h</span>
           <span><CloudRain size={12} /> Mưa {formatNumber(activeSlot.rain_probability)}%</span>
+          {activeSlot.evapotranspiration != null && <span><Droplets size={12} /> ET₀ {formatNumber(activeSlot.evapotranspiration)}</span>}
+          {activeSlot.soil_moisture != null && <span><Gauge size={12} /> Đất {formatNumber(activeSlot.soil_moisture)}%</span>}
         </div>
       )}
       <div className="chart-summary"><span><i className="temp-line" /> Nhiệt độ</span><span><Wind size={13} /> Gió mạnh nhất <b>{Math.max(...forecast.map((slot) => slot.wind_speed))} km/h</b></span><span><CloudRain size={13} /> Mưa cao nhất <b>{Math.max(...forecast.map((slot) => slot.rain_probability))}%</b></span></div>
