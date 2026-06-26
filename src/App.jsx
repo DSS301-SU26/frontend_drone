@@ -1993,6 +1993,43 @@ function formatVisibility(value) {
 function translateWeatherDescription(description) {
   if (!description) return "Điều kiện ổn định";
   const key = description.trim().toLowerCase();
+  
+  const wmoCodes = {
+    "0": "Trời quang",
+    "1": "Trời quang / Ít mây",
+    "2": "Mây rải rác",
+    "3": "Nhiều mây / Âm u",
+    "45": "Có sương mù",
+    "48": "Sương mù đóng băng",
+    "51": "Mưa phùn nhẹ",
+    "53": "Mưa phùn vừa",
+    "55": "Mưa phùn dày đặc",
+    "56": "Mưa phùn lạnh nhẹ",
+    "57": "Mưa phùn lạnh mạnh",
+    "61": "Mưa nhỏ",
+    "63": "Mưa vừa",
+    "65": "Mưa lớn",
+    "66": "Mưa lạnh nhẹ",
+    "67": "Mưa lạnh mạnh",
+    "71": "Tuyết rơi nhẹ",
+    "73": "Tuyết rơi vừa",
+    "75": "Tuyết rơi dày",
+    "77": "Tuyết hạt",
+    "80": "Mưa rào nhẹ",
+    "81": "Mưa rào vừa",
+    "82": "Mưa rào lớn",
+    "85": "Mưa rào tuyết nhẹ",
+    "86": "Mưa rào tuyết lớn",
+    "95": "Có dông",
+    "96": "Dông kèm mưa đá nhẹ",
+    "99": "Dông kèm mưa đá mạnh"
+  };
+
+  if (key.startsWith("code ")) {
+    const codeNum = key.replace("code ", "").trim();
+    if (wmoCodes[codeNum]) return wmoCodes[codeNum];
+  }
+
   const labels = {
     sunny: "Nắng",
     clear: "Trời quang",
