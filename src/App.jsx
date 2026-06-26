@@ -53,6 +53,7 @@ import {
   simulateAiTrainingImages,
   trainAiModel,
   updateDecisionConfig,
+  overrideDecision,
 } from "./api/dashboard";
 
 const DroneScene3D = lazy(() => import("./components/DroneScene3D"));
@@ -130,6 +131,31 @@ const localKpis = [
   { key: "evaluated_samples", label: "Mẫu dữ liệu kiểm chứng", value: 840, suffix: " mẫu", note: "240 giờ hoạt động thực tế", tone: "neutral" }
 ];
 
+function getDecisionAction(slot) {
+  const score = slot.decision_engine?.flyability_score ?? 0;
+  const isSafe = slot.decision_engine?.is_safe_to_fly;
+  
+  if (isSafe || score > 0.80) {
+    return "TAKE_OFF";
+  }
+  const rainProb = slot.weather?.precipitation_probability ?? 0;
+  const rainAmt = slot.weather?.precipitation ?? 0;
+  if (rainProb >= 50 || rainAmt > 0) {
+    return "RETURN_TO_CHARGING";
+  }
+  if (score >= 0.50) {
+    return "DELAY_FLIGHT";
+  }
+  return "LOCK_SPRAY";
+}
+
+function getRiskLevel(slot) {
+  const score = slot.decision_engine?.flyability_score ?? 0;
+  if (score > 0.80) return "LOW";
+  if (score >= 0.50) return "MEDIUM";
+  return "HIGH";
+}
+
 function App() {
   const [locations, setLocations] = useState([]);
   const [locationId, setLocationId] = useState("Dong Thap");
@@ -158,12 +184,18 @@ function App() {
   const dailySyncInFlightRef = useRef(false);
 
   const [farmSize, setFarmSize] = useState(10.0);
+  const [distanceKm, setDistanceKm] = useState(1.0);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([
     { sender: "ai", text: "Chào bạn! Tôi là AI Assistant của AgriFlight DSS. Tôi có thể giải đáp các thắc mắc về lịch sử hoạt động và quyết định bay của hệ thống." }
   ]);
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
+
+  const [isOverriding, setIsOverriding] = useState(false);
+  const [overrideDecisionValue, setOverrideDecisionValue] = useState("");
+  const [overrideNotes, setOverrideNotes] = useState("");
+  const [submittingOverride, setSubmittingOverride] = useState(false);
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -191,15 +223,17 @@ function App() {
     }
   };
 
-  const loadDashboard = useCallback(async (showToast = false) => {
+  const loadDashboard = useCallback(async (showToast = false, keepSelected = false) => {
     setSyncing(true);
     setError("");
     try {
-      const payload = await getDashboardSlots(locationId, null, farmSize);
+      const payload = await getDashboardSlots(locationId, null, farmSize, distanceKm);
       setDashboard(payload);
-      setSelectedSlot(0);
+      if (!keepSelected) {
+        setSelectedSlot(0);
+        setOperationTimestamp(payload.slots?.[0]?.timestamp || "");
+      }
       setDroneOpen(false);
-      setOperationTimestamp(payload.slots?.[0]?.timestamp || "");
       setDroneState("DOCKED");
       setSprayLocked(false);
       const syncedAt = new Date();
@@ -210,7 +244,65 @@ function App() {
     } finally {
       setSyncing(false);
     }
-  }, [locationId, farmSize, notify]);
+  }, [locationId, farmSize, distanceKm, notify]);
+
+  const handleOverrideDecision = async (e) => {
+    e?.preventDefault();
+    if (!current?.id) {
+      notify("Lỗi: Không tìm thấy ID cho bản ghi này.");
+      return;
+    }
+    if (!overrideDecisionValue) {
+      notify("Vui lòng chọn quyết định ghi đè.");
+      return;
+    }
+    setSubmittingOverride(true);
+    try {
+      await overrideDecision(
+        current.id,
+        overrideDecisionValue,
+        overrideNotes,
+        farmSize,
+        true,
+        distanceKm
+      );
+      notify("Đã cập nhật ghi đè quyết định thành công.");
+      setIsOverriding(false);
+      setOverrideNotes("");
+      await loadDashboard(false, true);
+    } catch (err) {
+      notify(`Ghi đè thất bại: ${err.message}`);
+    } finally {
+      setSubmittingOverride(false);
+    }
+  };
+
+  const handleRevertToAi = async () => {
+    if (!current?.id) {
+      notify("Lỗi: Không tìm thấy ID cho bản ghi này.");
+      return;
+    }
+    setSubmittingOverride(true);
+    try {
+      const aiDecision = current.decision_engine?.champion_score > 0.80 ? "TAKE_OFF" : "DELAY_FLIGHT";
+      await overrideDecision(
+        current.id,
+        aiDecision,
+        "",
+        farmSize,
+        false,
+        distanceKm
+      );
+      notify("Đã khôi phục quyết định đề xuất từ AI.");
+      setIsOverriding(false);
+      setOverrideNotes("");
+      await loadDashboard(false, true);
+    } catch (err) {
+      notify(`Khôi phục thất bại: ${err.message}`);
+    } finally {
+      setSubmittingOverride(false);
+    }
+  };
 
   const executePipelineRefresh = useCallback(async (showToast = true) => {
     setSyncing(true);
@@ -325,6 +417,9 @@ function App() {
       const hour = time ? Number(time.split(":")[0]) : 0;
       const end_time = time ? `${(hour + 1).toString().padStart(2, "0")}:00` : "";
       
+      const decision_action = getDecisionAction(slot);
+      const schedule_eligible = slot.decision_engine?.is_safe_to_fly ?? (decision_action === "TAKE_OFF");
+      
       return {
         ...slot,
         time,
@@ -340,9 +435,9 @@ function App() {
         weather_description: slot.weather?.weather_description,
         evapotranspiration: slot.weather?.evapotranspiration,
         soil_moisture: slot.weather?.soil_moisture,
-        decision_action: slot.decision_engine?.final_decision,
-        schedule_eligible: slot.decision_engine?.final_decision === "TAKE_OFF",
-        risk_level: slot.decision_engine?.risk_level,
+        decision_action,
+        schedule_eligible,
+        risk_level: getRiskLevel(slot),
         recommendation_text: slot.decision_engine?.xai_alert,
       };
     });
@@ -728,30 +823,38 @@ function App() {
                     </div>
 
                     {/* Giant Recommendation Card */}
-                    <div className={`border p-4 rounded-xl relative overflow-hidden shadow-lg transition duration-300 ${
-                      current?.decision_action === "TAKE_OFF"
+                    <div className={`border p-5 rounded-xl relative overflow-hidden shadow-lg transition duration-300 ${
+                      current?.was_human_overridden
+                        ? "bg-indigo-950/25 border-indigo-500/40 text-indigo-100"
+                        : current?.decision_engine?.is_safe_to_fly
                         ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-100"
-                        : current?.decision_action === "DELAY_FLIGHT"
+                        : (current?.decision_engine?.flyability_score ?? 0) >= 0.50
                         ? "bg-amber-950/20 border-amber-500/30 text-amber-100"
                         : "bg-red-950/20 border-red-500/30 text-red-100"
                     }`}>
                       <div className="flex justify-between items-start">
                         <div className="flex items-center gap-1.5">
                           <span className={`w-2.5 h-2.5 rounded-full flex items-center justify-center border animate-pulse ${
-                            current?.decision_action === "TAKE_OFF"
+                            current?.was_human_overridden
+                              ? "bg-indigo-500 border-indigo-300"
+                              : current?.decision_engine?.is_safe_to_fly
                               ? "bg-emerald-500 border-emerald-300"
-                              : current?.decision_action === "DELAY_FLIGHT"
+                              : (current?.decision_engine?.flyability_score ?? 0) >= 0.50
                               ? "bg-amber-500 border-amber-300"
                               : "bg-red-500 border-red-300"
                           }`}></span>
                           <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                            Khuyến nghị tự động từ hệ thống
+                            {current?.was_human_overridden 
+                              ? "Quyết định ghi đè bởi Quản trị viên" 
+                              : "Khuyến nghị tự động từ hệ thống"}
                           </span>
                         </div>
                         <div className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
-                          current?.decision_action === "TAKE_OFF"
+                          current?.was_human_overridden
+                            ? "bg-indigo-950/40 border-indigo-500/40 text-indigo-400"
+                            : current?.decision_engine?.is_safe_to_fly
                             ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-400"
-                            : current?.decision_action === "DELAY_FLIGHT"
+                            : (current?.decision_engine?.flyability_score ?? 0) >= 0.50
                             ? "bg-amber-950/40 border-amber-500/40 text-amber-400"
                             : "bg-red-950/40 border-red-500/40 text-red-400"
                         }`}>
@@ -774,17 +877,188 @@ function App() {
                           <span className="text-xs text-slate-400 block font-semibold">L/ha</span>
                         </div>
                       </div>
+
+                      {/* Flyability Score Progress Bar */}
+                      <div className="mt-4 p-3 bg-black/35 border border-slate-800/40 rounded-xl flex flex-col gap-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-400 uppercase tracking-wider">Khả năng cất cánh (AI Flyability Score)</span>
+                          <span className={`font-mono font-black text-sm ${
+                            (current?.decision_engine?.flyability_score ?? 0) > 0.80
+                              ? "text-emerald-400"
+                              : (current?.decision_engine?.flyability_score ?? 0) >= 0.50
+                              ? "text-amber-400"
+                              : "text-red-400"
+                          }`}>
+                            {formatNumber((current?.decision_engine?.flyability_score ?? 0) * 100)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-500 rounded-full ${
+                              (current?.decision_engine?.flyability_score ?? 0) > 0.80
+                                ? "bg-emerald-500"
+                                : (current?.decision_engine?.flyability_score ?? 0) >= 0.50
+                                ? "bg-amber-500"
+                                : "bg-red-500"
+                            }`}
+                            style={{ width: `${(current?.decision_engine?.flyability_score ?? 0) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Take Off Button or Warning XAI Alert */}
+                      <div className="mt-3.5">
+                        {current?.decision_engine?.is_safe_to_fly ? (
+                          <button
+                            onClick={launchDrone}
+                            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 text-white font-bold py-2 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/40 text-xs tracking-wide"
+                          >
+                            <Plane size={14} /> KÍCH HOẠT CẤT CÁNH (TAKE OFF)
+                          </button>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            <button
+                              disabled
+                              className="w-full bg-slate-900/50 border border-slate-800 text-slate-500 font-bold py-2 px-4 rounded-xl cursor-not-allowed flex items-center justify-center gap-2 text-xs"
+                            >
+                              <Lock size={13} /> CẤT CÁNH BỊ KHÓA (SAFETY LOCK)
+                            </button>
+                            <p className="text-[11px] text-red-400 bg-red-950/20 border border-red-500/20 p-2.5 rounded-lg leading-relaxed font-mono flex items-start gap-1.5">
+                              <CircleAlert size={14} className="flex-shrink-0 text-red-400 mt-0.5" />
+                              <span>{current?.decision_engine?.xai_alert}</span>
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {current?.was_human_overridden && (
+                        <div className="mt-3 p-3 bg-indigo-950/40 border border-indigo-500/20 rounded-lg text-xs flex flex-col gap-1">
+                          <span className="font-bold text-indigo-450 uppercase tracking-wider text-[10px]">
+                            Lý do ghi đè của Quản trị viên:
+                          </span>
+                          <p className="italic text-slate-300 leading-relaxed font-sans font-medium">
+                            "{current.user_notes || "Không ghi chú lý do."}"
+                          </p>
+                        </div>
+                      )}
+
+                      {!isOverriding && (
+                        <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-800/30 pt-3">
+                          {current?.was_human_overridden ? (
+                            <div className="flex gap-2 w-full">
+                              <button
+                                onClick={() => {
+                                  setOverrideDecisionValue(current?.decision_action);
+                                  setOverrideNotes(current?.user_notes || "");
+                                  setIsOverriding(true);
+                                }}
+                                className="flex-1 bg-indigo-600/30 hover:bg-indigo-600/45 active:bg-indigo-700/50 border border-indigo-500/35 text-indigo-200 text-xs font-bold py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5"
+                              >
+                                <SlidersHorizontal size={14} /> Sửa quyết định
+                              </button>
+                              <button
+                                onClick={handleRevertToAi}
+                                disabled={submittingOverride}
+                                className="flex-1 bg-slate-850 hover:bg-slate-800 active:bg-slate-900 border border-slate-700 text-slate-200 text-xs font-bold py-2 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                              >
+                                <RotateCcw size={14} className={submittingOverride ? "animate-spin" : ""} /> Khôi phục AI
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setOverrideDecisionValue(current?.decision_action || "TAKE_OFF");
+                                setOverrideNotes("");
+                                setIsOverriding(true);
+                              }}
+                              className="w-full bg-slate-850 hover:bg-slate-800 active:bg-slate-900 border border-slate-750 text-slate-200 text-xs font-bold py-2 px-4 rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm"
+                            >
+                              <ShieldAlert size={14} className="text-amber-500" /> Cưỡng ép / Ghi đè quyết định bay
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {isOverriding && (
+                        <motion.form
+                          onSubmit={handleOverrideDecision}
+                          className="mt-4 p-4 bg-slate-900/90 border border-slate-800 rounded-xl flex flex-col gap-3 relative shadow-inner"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                        >
+                          <div className="flex justify-between items-center pb-2 border-b border-slate-800/40">
+                            <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                              <ShieldAlert size={14} className="text-indigo-400" /> Cấu hình ghi đè quyết định
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsOverriding(false)}
+                              className="text-slate-400 hover:text-slate-200 p-0.5 rounded-lg hover:bg-slate-800 transition-all"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Chọn quyết định cưỡng ép</label>
+                            <select
+                              value={overrideDecisionValue}
+                              onChange={(e) => setOverrideDecisionValue(e.target.value)}
+                              className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-bold focus:outline-none focus:border-indigo-500 transition-all cursor-pointer"
+                            >
+                              <option value="TAKE_OFF">TAKE_OFF (Cho phép cất cánh)</option>
+                              <option value="DELAY_FLIGHT">DELAY_FLIGHT (Hoãn chuyến bay)</option>
+                              <option value="LOCK_SPRAY">LOCK_SPRAY (Khóa phun thuốc)</option>
+                              <option value="RETURN_TO_CHARGING">RETURN_TO_CHARGING (UAV về trạm sạc)</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lý do ghi đè (bắt buộc)</label>
+                            <textarea
+                              rows={2}
+                              value={overrideNotes}
+                              onChange={(e) => setOverrideNotes(e.target.value)}
+                              placeholder="Ví dụ: Quan sát thấy gió lặng thực tế, độ ẩm đất phù hợp cất cánh..."
+                              required
+                              className="bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 transition-all resize-none leading-relaxed"
+                            />
+                          </div>
+
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setIsOverriding(false)}
+                              className="flex-1 bg-slate-950 hover:bg-slate-800 active:bg-slate-900 border border-slate-850 text-slate-400 text-xs font-bold py-2 rounded-lg transition-all"
+                            >
+                              Hủy
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={submittingOverride || !overrideNotes.trim()}
+                              className="flex-1 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {submittingOverride ? (
+                                <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Check size={14} />
+                              )}
+                              Lưu Ghi Đè
+                            </button>
+                          </div>
+                        </motion.form>
+                      )}
                     </div>
 
                     {/* XAI Alert Banner */}
-                    {current?.decision_action !== "TAKE_OFF" && current?.decision_engine?.xai_alert && (
+                    {!current?.decision_engine?.is_safe_to_fly && current?.decision_engine?.xai_alert && (
                       <div className={`p-4 rounded-xl border flex items-start gap-3 mt-4 ${
-                        current?.decision_engine?.risk_level === "HIGH" 
+                        (current?.decision_engine?.flyability_score ?? 0) < 0.50 
                           ? "bg-red-950/30 border-red-500/30 text-red-200" 
                           : "bg-amber-950/30 border-amber-500/30 text-amber-200"
                       }`}>
                         <div className={`p-1.5 rounded-lg flex-shrink-0 ${
-                          current?.decision_engine?.risk_level === "HIGH" ? "bg-red-900/40 text-red-400" : "bg-amber-900/40 text-amber-400"
+                          (current?.decision_engine?.flyability_score ?? 0) < 0.50 ? "bg-red-900/40 text-red-400" : "bg-amber-900/40 text-amber-400"
                         }`}>
                           <CircleAlert size={16} />
                         </div>
@@ -820,16 +1094,16 @@ function App() {
                       <span className="text-xs font-bold text-slate-400">Champion: Random Forest</span>
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-slate-200">
-                          {translatePrediction(current?.decision_engine?.champion_prediction)}
+                          Khả năng bay
                         </span>
                         <span className="text-xs font-extrabold text-emerald-400 font-mono">
-                          {current?.decision_engine?.champion_confidence != null ? Math.round(current.decision_engine.champion_confidence * 100) : 0}%
+                          {current?.decision_engine?.champion_score != null ? Math.round(current.decision_engine.champion_score * 100) : 0}%
                         </span>
                       </div>
                       <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
                         <div 
                           className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                          style={{ width: `${current?.decision_engine?.champion_confidence != null ? Math.round(current.decision_engine.champion_confidence * 100) : 0}%` }}
+                          style={{ width: `${current?.decision_engine?.champion_score != null ? Math.round(current.decision_engine.champion_score * 100) : 0}%` }}
                         ></div>
                       </div>
                     </div>
@@ -839,29 +1113,39 @@ function App() {
                       <span className="text-xs font-bold text-slate-400">Challenger: XGBoost</span>
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-slate-200">
-                          {translatePrediction(current?.decision_engine?.challenger_prediction)}
+                          Khả năng bay
                         </span>
                         <span className="text-xs font-extrabold text-blue-400 font-mono">
-                          {current?.decision_engine?.challenger_confidence != null ? Math.round(current.decision_engine.challenger_confidence * 100) : 0}%
+                          {current?.decision_engine?.challenger_score != null ? Math.round(current.decision_engine.challenger_score * 100) : 0}%
                         </span>
                       </div>
                       <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden">
                         <div 
                           className="bg-blue-500 h-full rounded-full transition-all duration-500"
-                          style={{ width: `${current?.decision_engine?.challenger_confidence != null ? Math.round(current.decision_engine.challenger_confidence * 100) : 0}%` }}
+                          style={{ width: `${current?.decision_engine?.challenger_score != null ? Math.round(current.decision_engine.challenger_score * 100) : 0}%` }}
                         ></div>
                       </div>
                     </div>
                   </div>
 
                   {/* Consensus / Conflict Alert */}
-                  {current?.decision_engine?.was_conflict && (
+                  {current?.decision_engine?.was_conflict ? (
                     <div className="p-3 bg-amber-950/20 border border-amber-500/30 rounded-xl flex items-start gap-2 text-amber-200">
                       <CircleAlert size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-[11px] font-bold uppercase tracking-wider">Cảnh báo: Có sự xung đột quyết định</span>
-                        <p className="text-xs font-medium">
-                          Hệ thống đã tự động giải quyết xung đột bằng thuật toán đồng thuận an toàn.
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400">AI Xung Đột (Đang áp dụng luật Thận trọng tối đa)</span>
+                        <p className="text-xs font-medium text-slate-300">
+                          Hai mô hình dự báo không đồng nhất. Hệ thống tự động kích hoạt chế độ phòng ngừa an toàn cao nhất.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-950/25 border border-emerald-500/20 rounded-xl flex items-start gap-2 text-emerald-300">
+                      <Check size={14} className="text-emerald-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">AI Đồng Thuận</span>
+                        <p className="text-xs font-medium text-slate-300">
+                          Cả hai mô hình dự báo học máy đều đồng thuận về quyết định vận hành của hệ thống.
                         </p>
                       </div>
                     </div>
@@ -904,6 +1188,34 @@ function App() {
                     />
                   </div>
 
+                  {/* Travel Distance Input & Slider */}
+                  <div className="flex flex-col gap-2 border-t border-[#142820]/15 pt-2.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-300 font-medium">Khoảng cách đến ruộng (km)</span>
+                      <div className="flex items-center gap-1">
+                        <input 
+                          type="number" 
+                          min="0.1" 
+                          max="15.0" 
+                          step="0.1"
+                          value={distanceKm}
+                          onChange={(e) => setDistanceKm(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
+                          className="w-16 bg-slate-900 border border-slate-800 text-slate-100 font-bold font-mono text-center rounded py-0.5 focus:border-emerald-500 focus:outline-none"
+                        />
+                        <span className="text-slate-400">km</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="15.0"
+                      step="0.1"
+                      value={distanceKm}
+                      onChange={(e) => setDistanceKm(parseFloat(e.target.value))}
+                      className="w-full accent-emerald-500 bg-slate-950 h-1.5 rounded-lg cursor-pointer"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3 border-t border-[#142820]/20 pt-3">
                     <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-lg">
                       <span className="text-xs text-slate-500 font-bold uppercase block">Định mức phun</span>
@@ -929,9 +1241,18 @@ function App() {
                     <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-lg">
                       <span className="text-xs text-slate-500 font-bold uppercase block">Chu kỳ pin</span>
                       <strong className="text-base font-extrabold text-slate-200 font-mono">
-                        {current?.decision_engine?.resource_regressor?.battery_cycles ?? 0}
+                        {current?.decision_engine?.resource_regressor?.battery_cycles_needed ?? 0}
                       </strong>
                       <span className="text-xs text-slate-400 ml-1">chu kỳ</span>
+                    </div>
+                    <div className="bg-slate-900/30 border border-slate-800/40 p-2.5 rounded-lg col-span-2 flex justify-between items-center">
+                      <span className="text-xs text-slate-500 font-bold uppercase text-[10px]">Khoảng cách phản hồi (API)</span>
+                      <div className="flex items-baseline">
+                        <strong className="text-sm font-black text-slate-200 font-mono">
+                          {formatNumber(current?.decision_engine?.resource_regressor?.distance_to_field_km ?? 0)}
+                        </strong>
+                        <span className="text-xs text-slate-400 ml-1 font-bold">km</span>
+                      </div>
                     </div>
                   </div>
                 </section>

@@ -14,10 +14,11 @@ export function getLocations() {
   return request("/api/locations");
 }
 
-export function getDashboardSlots(location, at = null, farmSize = 10.0) {
+export function getDashboardSlots(location, at = null, farmSize = 10.0, distanceKm = 1.0) {
   const params = new URLSearchParams({
     location,
     farm_size_ha: farmSize.toString(),
+    distance_km: distanceKm.toString(),
     refresh: Date.now().toString(),
   });
   if (at) params.set("at", at);
@@ -80,4 +81,18 @@ export function runPipeline({ days = 3, skipUpload = false } = {}) {
     skip_upload: skipUpload ? "true" : "false",
   });
   return request(`/api/pipeline/run?${params.toString()}`, { method: "POST" });
+}
+
+export function overrideDecision(id, decision, notes = "", farmSize = 10.0, wasHumanOverridden = true, distanceToFieldKm = 1.0) {
+  return request(`/api/decisions/${id}/override`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      override_decision: decision,
+      user_notes: notes,
+      farm_size_ha: farmSize,
+      was_human_overridden: wasHumanOverridden,
+      distance_to_field_km: distanceToFieldKm,
+    }),
+  });
 }
