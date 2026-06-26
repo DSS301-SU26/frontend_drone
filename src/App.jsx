@@ -819,10 +819,6 @@ function App() {
                         <th className="py-3.5 px-4">Khung giờ</th>
                         <th className="py-3.5 px-4">Khả năng bay</th>
                         <th className="py-3.5 px-4">AI Khuyến nghị</th>
-                        <th className="py-3.5 px-4 text-center">Nhiệt độ</th>
-                        <th className="py-3.5 px-4 text-center">Xác suất mưa</th>
-                        <th className="py-3.5 px-4 text-center">Gió / Gió giật</th>
-                        <th className="py-3.5 px-4 text-center">Độ ẩm</th>
                         <th className="py-3.5 px-4 text-center">AI Đồng thuận</th>
                         <th className="py-3.5 px-4 text-center">Chu kỳ pin</th>
                         <th className="py-3.5 px-4 text-center">Quyết định QTV</th>
@@ -890,38 +886,6 @@ function App() {
                             <td className="py-3 px-4">
                               <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}`}>
                                 {actionCfg.short}
-                              </span>
-                            </td>
-                            
-                            <td className="py-3 px-4 text-center">
-                              <span className="text-xs font-bold font-mono text-slate-300">
-                                {slot.temperature}°C
-                              </span>
-                            </td>
-                            
-                            <td className="py-3 px-4 text-center">
-                              <span className="text-xs font-bold font-mono text-blue-400">
-                                {slot.rain_probability}%
-                              </span>
-                              {slot.precipitation > 0 && (
-                                <span className="text-[10px] text-blue-500 ml-1">({slot.precipitation}mm)</span>
-                              )}
-                            </td>
-                            
-                            <td className="py-3 px-4 text-center">
-                              <span className="text-xs font-bold font-mono text-slate-300">
-                                {Math.round(slot.wind_speed)}
-                              </span>
-                              <span className="text-[10px] text-slate-500 mx-0.5">/</span>
-                              <span className="text-xs font-bold font-mono text-amber-500" title="Gió giật">
-                                {Math.round(slot.wind_gust)}
-                              </span>
-                              <span className="text-[9px] text-slate-500 ml-1">km/h</span>
-                            </td>
-
-                            <td className="py-3 px-4 text-center">
-                              <span className="text-xs font-bold font-mono text-slate-400">
-                                {slot.humidity}%
                               </span>
                             </td>
                             
