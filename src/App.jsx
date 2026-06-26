@@ -32,6 +32,7 @@ import {
   Save,
   Search,
   ShieldAlert,
+  ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   ThermometerSun,
@@ -40,6 +41,7 @@ import {
   Wind,
   X,
   Zap,
+  Eye,
 } from "lucide-react";
 import {
   extractAiTrainingFeatures,
@@ -185,6 +187,7 @@ function App() {
 
   const [farmSize, setFarmSize] = useState(10.0);
   const [distanceKm, setDistanceKm] = useState(1.0);
+  const [slotViewMode, setSlotViewMode] = useState("timeline");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState([
     { sender: "ai", text: "Chào bạn! Tôi là AI Assistant của AgriFlight DSS. Tôi có thể giải đáp các thắc mắc về lịch sử hoạt động và quyết định bay của hệ thống." }
@@ -740,45 +743,240 @@ function App() {
             
             {/* Row 1: Micro-climate & Timeline */}
             <section className="bg-[#0d1613]/80 backdrop-blur-md border border-[#142820]/40 p-6 rounded-2xl shadow-xl flex flex-col gap-5">
-              <div className="flex justify-between items-center border-b border-[#142820]/30 pb-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#142820]/30 pb-3">
                 <div>
                   <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider">Thông tin vi khí hậu & Lịch trình</span>
                   <h3 className="text-lg font-bold text-slate-100 mt-0.5">Thời tiết từng khung giờ bay</h3>
                 </div>
-                <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* View Mode Toggle */}
+                  <div className="flex items-center bg-[#09100e] border border-[#142d22] p-0.5 rounded-xl shadow-inner">
+                    <button
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                        slotViewMode === "timeline"
+                          ? "bg-emerald-600 text-white shadow-md font-extrabold"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-[#12241b]/30"
+                      }`}
+                      onClick={() => setSlotViewMode("timeline")}
+                    >
+                      Dòng thời gian
+                    </button>
+                    <button
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all duration-200 ${
+                        slotViewMode === "grid"
+                          ? "bg-emerald-600 text-white shadow-md font-extrabold"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-[#12241b]/30"
+                      }`}
+                      onClick={() => setSlotViewMode("grid")}
+                    >
+                      Bảng tổng quan cả ngày
+                    </button>
+                  </div>
+
+                  <span className="text-xs text-slate-400 flex items-center gap-1.5 bg-[#08110e] px-2.5 py-1.5 rounded-xl border border-[#142d22]/50">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    Đồng bộ: {formatDateTime(dashboard.source.updated_at)}
                   </span>
-                  Đồng bộ: {formatDateTime(dashboard.source.updated_at)}
-                </span>
+                </div>
               </div>
 
-              {/* Timeline slots scrollable row */}
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-emerald-800 scrollbar-track-transparent">
-                {slots.map((slot, index) => {
-                  const isSelected = selectedSlot === index;
-                  return (
-                    <button 
-                      className={`flex-shrink-0 px-4 py-2.5 rounded-xl border text-left transition flex flex-col gap-1 w-32 ${
-                        isSelected 
-                          ? "bg-emerald-600 border-emerald-500 text-white font-bold shadow-lg" 
-                          : slot.schedule_eligible
-                          ? "bg-slate-900/40 border-slate-800/80 text-slate-300 hover:border-slate-700"
-                          : "bg-red-950/10 border-red-500/15 text-slate-400 opacity-60 hover:opacity-80"
-                      }`}
-                      onClick={() => setSelectedSlot(index)} 
-                      key={slot.timestamp}
-                    >
-                      <span className="text-xs font-bold font-mono">{slot.time}</span>
-                      <div className="flex justify-between items-center mt-1 text-xs opacity-90">
-                        <span>{slot.temperature}°C</span>
-                        <span>{slot.flyability_score}đ</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              {slotViewMode === "timeline" ? (
+                /* Timeline slots scrollable row */
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-emerald-800 scrollbar-track-transparent">
+                  {slots.map((slot, index) => {
+                    const isSelected = selectedSlot === index;
+                    return (
+                      <button 
+                        className={`flex-shrink-0 px-4 py-2.5 rounded-xl border text-left transition flex flex-col gap-1 w-32 ${
+                          isSelected 
+                            ? "bg-emerald-600 border-emerald-500 text-white font-bold shadow-lg" 
+                            : slot.schedule_eligible
+                            ? "bg-slate-900/40 border-slate-800/80 text-slate-300 hover:border-slate-700"
+                            : "bg-red-950/10 border-red-500/15 text-slate-400 opacity-60 hover:opacity-80"
+                        }`}
+                        onClick={() => setSelectedSlot(index)} 
+                        key={slot.timestamp}
+                      >
+                        <span className="text-xs font-bold font-mono">{slot.time}</span>
+                        <div className="flex justify-between items-center mt-1 text-xs opacity-90">
+                          <span>{slot.temperature}°C</span>
+                          <span>{slot.flyability_score}đ</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Beautiful Daily Overview Grid Table */
+                <div className="overflow-x-auto max-h-[480px] overflow-y-auto border border-[#142820]/30 rounded-xl scrollbar-thin scrollbar-thumb-emerald-800 scrollbar-track-transparent shadow-2xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950/70 text-slate-400 text-[10px] font-bold uppercase tracking-wider sticky top-0 backdrop-blur-md border-b border-[#142820]/40 z-10">
+                        <th className="py-3.5 px-4">Khung giờ</th>
+                        <th className="py-3.5 px-4">Khả năng bay</th>
+                        <th className="py-3.5 px-4">AI Khuyến nghị</th>
+                        <th className="py-3.5 px-4 text-center">Nhiệt độ</th>
+                        <th className="py-3.5 px-4 text-center">Xác suất mưa</th>
+                        <th className="py-3.5 px-4 text-center">Gió / Gió giật</th>
+                        <th className="py-3.5 px-4 text-center">Độ ẩm</th>
+                        <th className="py-3.5 px-4 text-center">AI Đồng thuận</th>
+                        <th className="py-3.5 px-4 text-center">Chu kỳ pin</th>
+                        <th className="py-3.5 px-4 text-center">Quyết định QTV</th>
+                        <th className="py-3.5 px-4 text-right">Chi tiết</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#142820]/15">
+                      {slots.map((slot, index) => {
+                        const isSelected = selectedSlot === index;
+                        const scorePercent = slot.decision_engine?.flyability_score != null 
+                          ? Math.round(slot.decision_engine.flyability_score * 100) 
+                          : Math.round(slot.flyability_score ?? 0);
+                        
+                        let progressBarColor = "bg-red-500";
+                        let scoreTextColor = "text-red-400";
+                        if (scorePercent > 80) {
+                          progressBarColor = "bg-emerald-500";
+                          scoreTextColor = "text-emerald-400";
+                        } else if (scorePercent >= 50) {
+                          progressBarColor = "bg-amber-500";
+                          scoreTextColor = "text-amber-400";
+                        }
+                        
+                        const aiAction = slot.decision_action;
+                        const actionCfg = actionConfig[aiAction] ?? actionConfig.DELAY_FLIGHT;
+                        
+                        let badgeColor = "bg-red-950/20 text-red-400 border-red-500/20";
+                        if (aiAction === "TAKE_OFF") {
+                          badgeColor = "bg-emerald-950/25 text-emerald-400 border-emerald-500/20";
+                        } else if (aiAction === "DELAY_FLIGHT") {
+                          badgeColor = "bg-amber-950/20 text-amber-400 border-amber-500/20";
+                        }
+                        
+                        return (
+                          <tr 
+                            key={slot.timestamp}
+                            className={`transition-all duration-150 border-l-2 cursor-pointer ${
+                              isSelected 
+                                ? "bg-[#10241d]/40 border-l-emerald-500 hover:bg-[#10241d]/50" 
+                                : "bg-transparent border-l-transparent hover:bg-slate-900/30"
+                            }`}
+                            onClick={() => setSelectedSlot(index)}
+                          >
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>}
+                                <span className={`text-xs font-bold font-mono ${isSelected ? "text-emerald-400" : "text-slate-200"}`}>
+                                  {slot.time} - {slot.end_time}
+                                </span>
+                              </div>
+                            </td>
+                            
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2 min-w-[90px]">
+                                <div className="w-14 bg-slate-950 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className={`${progressBarColor} h-full rounded-full transition-all duration-500`}
+                                    style={{ width: `${scorePercent}%` }}
+                                  ></div>
+                                </div>
+                                <span className={`text-xs font-bold font-mono ${scoreTextColor}`}>{scorePercent}%</span>
+                              </div>
+                            </td>
+                            
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}`}>
+                                {actionCfg.short}
+                              </span>
+                            </td>
+                            
+                            <td className="py-3 px-4 text-center">
+                              <span className="text-xs font-bold font-mono text-slate-300">
+                                {slot.temperature}°C
+                              </span>
+                            </td>
+                            
+                            <td className="py-3 px-4 text-center">
+                              <span className="text-xs font-bold font-mono text-blue-400">
+                                {slot.rain_probability}%
+                              </span>
+                              {slot.precipitation > 0 && (
+                                <span className="text-[10px] text-blue-500 ml-1">({slot.precipitation}mm)</span>
+                              )}
+                            </td>
+                            
+                            <td className="py-3 px-4 text-center">
+                              <span className="text-xs font-bold font-mono text-slate-300">
+                                {Math.round(slot.wind_speed)}
+                              </span>
+                              <span className="text-[10px] text-slate-500 mx-0.5">/</span>
+                              <span className="text-xs font-bold font-mono text-amber-500" title="Gió giật">
+                                {Math.round(slot.wind_gust)}
+                              </span>
+                              <span className="text-[9px] text-slate-500 ml-1">km/h</span>
+                            </td>
+
+                            <td className="py-3 px-4 text-center">
+                              <span className="text-xs font-bold font-mono text-slate-400">
+                                {slot.humidity}%
+                              </span>
+                            </td>
+                            
+                            <td className="py-3 px-4 text-center">
+                              {slot.decision_engine?.was_conflict ? (
+                                <span className="px-1.5 py-0.5 bg-amber-950/20 text-amber-400 border border-amber-500/20 rounded text-[9px] font-bold">
+                                  Xung đột
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 bg-emerald-950/20 text-emerald-400 border border-emerald-500/20 rounded text-[9px] font-bold">
+                                  Đồng thuận
+                                </span>
+                              )}
+                            </td>
+                            
+                            <td className="py-3 px-4 text-center">
+                              <span className="text-xs font-bold font-mono text-slate-300">
+                                {slot.decision_engine?.resource_regressor?.battery_cycles_needed ?? 0}
+                              </span>
+                            </td>
+                            
+                            <td className="py-3 px-4 text-center">
+                              {slot.was_human_overridden ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-indigo-950/30 text-indigo-400 border border-indigo-500/25 rounded text-[9px] font-bold">
+                                  <ShieldCheck size={10} className="text-indigo-400" />
+                                  Ghi đè
+                                </span>
+                              ) : (
+                                <span className="text-slate-600 text-xs">-</span>
+                              )}
+                            </td>
+                            
+                            <td className="py-3 px-4 text-right">
+                              <button
+                                className={`p-1.5 rounded-lg border text-xs font-bold transition flex items-center gap-1 ml-auto ${
+                                  isSelected
+                                    ? "bg-emerald-600 border-emerald-500 text-white"
+                                    : "bg-slate-900/50 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+                                }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSlot(index);
+                                }}
+                              >
+                                <Eye size={12} />
+                                <span>Xem</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {/* Consolidated Weather Metrics Row */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-2">
