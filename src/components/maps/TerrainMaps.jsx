@@ -1,38 +1,113 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+const SATELLITE_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+const CENTER = [10.45, 106.62]; // Đồng Tháp / Long An area
+
+const plot1Coords = [
+  [10.452, 106.618],
+  [10.452, 106.622],
+  [10.448, 106.622],
+  [10.448, 106.618],
+];
+
+const plot2Coords = [
+  [10.448, 106.618],
+  [10.448, 106.622],
+  [10.445, 106.622],
+  [10.445, 106.618],
+];
+
+const plot3Coords = [
+  [10.452, 106.623],
+  [10.452, 106.628],
+  [10.446, 106.628],
+  [10.446, 106.623],
+];
 
 export default function TerrainMaps() {
+  const mapRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const boundaryLayerRef = useRef(null);
+  const ndviLayerRef = useRef(null);
+
+  const [showBoundaries, setShowBoundaries] = useState(true);
+  const [showNdvi, setShowNdvi] = useState(true);
+
+  // Initialize leaflet map once
+  useEffect(() => {
+    if (mapInstanceRef.current) return; // already initialized
+
+    const map = L.map(mapRef.current, {
+      center: CENTER,
+      zoom: 16,
+      zoomControl: false,
+      attributionControl: false,
+    });
+
+    L.tileLayer(SATELLITE_URL, { maxZoom: 19 }).addTo(map);
+
+    mapInstanceRef.current = map;
+
+    // Boundary polygons
+    const boundaryGroup = L.layerGroup([
+      L.polygon(plot1Coords, { color: "#4bddb7", fill: false, dashArray: "8 4", weight: 2 }),
+      L.polygon(plot2Coords, { color: "#4bddb7", fill: false, dashArray: "8 4", weight: 2 }),
+      L.polygon(plot3Coords, { color: "#3c4a44", fill: false, dashArray: "8 4", weight: 2 }),
+    ]).addTo(map);
+    boundaryLayerRef.current = boundaryGroup;
+
+    // NDVI overlay
+    const ndviGroup = L.layerGroup([
+      L.polygon(plot3Coords, { color: "transparent", fillColor: "#f0bf63", fillOpacity: 0.5 }),
+    ]).addTo(map);
+    ndviLayerRef.current = ndviGroup;
+
+    // Fix tile rendering on container resize
+    setTimeout(() => map.invalidateSize(), 200);
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  // Toggle boundary layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const layer = boundaryLayerRef.current;
+    if (!map || !layer) return;
+    if (showBoundaries) {
+      if (!map.hasLayer(layer)) map.addLayer(layer);
+    } else {
+      if (map.hasLayer(layer)) map.removeLayer(layer);
+    }
+  }, [showBoundaries]);
+
+  // Toggle NDVI layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const layer = ndviLayerRef.current;
+    if (!map || !layer) return;
+    if (showNdvi) {
+      if (!map.hasLayer(layer)) map.addLayer(layer);
+    } else {
+      if (map.hasLayer(layer)) map.removeLayer(layer);
+    }
+  }, [showNdvi]);
+
+  const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
+  const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
+  const handleRecenter = () => mapInstanceRef.current?.flyTo(CENTER, 16);
+
   return (
     <div className="flex-1 relative w-full h-[calc(100vh-64px)] md:h-full bg-surface-dim overflow-hidden rounded-xl border border-outline-variant">
-      {/* Map Background Layer */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center" 
-        style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBESXJY4fL-Q1FrGq5Mvzp02FtPPSVhz_JBuwWrufaPmu37jUYT-HLIi_sDwcs6ttWiGlI-mV4ebcHMa-ymmE5xVhG0fKG9ZeP7YPyzDFnjh_t6nM4QmiJFqCHVkeqJ1PZFk5GZybme0QXvhoNsfAdhRtu0iyV2Av4TmSf-Gxaho-q5GoQETwwaNBSu1lAv-a4A0MKvhaUQSwiP_1pyayrXJNxpa5fQZjkYVE4pKh_DTeTLRaKUcWxbmg')" }}
-      ></div>
-      
-      {/* Technical Grid Overlay */}
-      <div className="absolute inset-0 opacity-30 pointer-events-none mix-blend-overlay" style={{ backgroundImage: "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHBhdGggZD0iTTAgMGg0MHY0MEgwem0zOSAzaC0zdjM0aDNWM3ptLTQgMHYzNGgtM3YtMzRoM3ptLTQgMHYzNGgtM3YtMzRoM3ptLTQgMHYzNGgtM3YtMzRoM3ptLTQgMHYzNGgtM3YtMzRoM3ptLTQgMHYzNGgtM3YtMzRoM3ptLTQgMHYzNGgtM3YtMzRoM3ptLTQgMHYzNGgtM3YtMzRoM3ptLTQgMHYzNGgtM3YtMzRoM3oiIGZpbGw9IiMzYzRhNDQiIGZpbGwtb3BhY2l0eT0iMC4xIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiLz48L3N2Zz4=')" }}></div>
-      
-      {/* Fake Data Overlays (Plot Boundaries & NDVI) */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-80" preserveAspectRatio="none" viewBox="0 0 1000 800">
-        {/* Plot Boundaries */}
-        <path d="M 100 100 L 400 120 L 450 300 L 150 280 Z" fill="none" stroke="#4bddb7" strokeDasharray="8 4" strokeWidth="2"></path>
-        <path d="M 450 130 L 800 90 L 850 400 L 500 350 Z" fill="none" stroke="#4bddb7" strokeDasharray="8 4" strokeWidth="2"></path>
-        <path d="M 120 320 L 480 370 L 400 700 L 80 650 Z" fill="none" stroke="#3c4a44" strokeDasharray="8 4" strokeWidth="2"></path>
-        
-        {/* NDVI Heatmap effect in one plot */}
-        <polygon fill="url(#ndviGradient)" opacity="0.6" points="450,130 800,90 850,400 500,350" style={{ mixBlendMode: "overlay" }}></polygon>
-        
-        <defs>
-          <linearGradient id="ndviGradient" x1="0%" x2="100%" y1="0%" y2="100%">
-            <stop offset="0%" stopColor="#00b894"></stop>
-            <stop offset="50%" stopColor="#f0bf63"></stop>
-            <stop offset="100%" stopColor="#ffb4ab"></stop>
-          </linearGradient>
-        </defs>
-      </svg>
+      {/* Real Interactive Map */}
+      <div ref={mapRef} className="absolute inset-0 z-0" style={{ background: "#111" }}></div>
 
       {/* Floating Control Panels (Right Side) */}
-      <div className="absolute top-md right-md flex flex-col gap-sm z-20 w-[320px]">
+      <div className="absolute top-md right-md flex flex-col gap-sm z-[1000] w-[320px]">
         
         {/* Data Layers Card */}
         <div className="bg-surface-container-low/95 backdrop-blur-xl border border-outline-variant rounded-xl p-md shadow-2xl">
@@ -42,25 +117,25 @@ export default function TerrainMaps() {
           </div>
           <div className="flex flex-col gap-5">
             {/* Toggle 1: Plot Boundaries */}
-            <div className="flex items-center justify-between group cursor-pointer">
+            <div className="flex items-center justify-between group cursor-pointer" onClick={() => setShowBoundaries(!showBoundaries)}>
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-sm">dashboard</span>
                 <span className="font-body-md text-body-md text-on-surface">Ranh giới Lô đất</span>
               </div>
-              <button className="w-10 h-5 bg-primary-container rounded-full relative transition-colors shadow-[0_0_8px_rgba(0,184,148,0.3)]">
-                <span className="absolute right-0.5 top-0.5 w-4 h-4 bg-on-primary rounded-full"></span>
+              <button className={`w-10 h-5 rounded-full relative transition-colors ${showBoundaries ? 'bg-primary-container shadow-[0_0_8px_rgba(0,184,148,0.3)]' : 'bg-surface-container-highest border border-outline-variant'}`}>
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${showBoundaries ? 'right-0.5 bg-on-primary' : 'left-0.5 bg-outline-variant'}`}></span>
               </button>
             </div>
             
             {/* Toggle 2: NDVI */}
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between group cursor-pointer">
+              <div className="flex items-center justify-between group cursor-pointer" onClick={() => setShowNdvi(!showNdvi)}>
                 <div className="flex items-center gap-3">
                   <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-sm">compost</span>
                   <span className="font-body-md text-body-md text-on-surface">NDVI (Sức khỏe Cây trồng)</span>
                 </div>
-                <button className="w-10 h-5 bg-primary-container rounded-full relative transition-colors shadow-[0_0_8px_rgba(0,184,148,0.3)]">
-                  <span className="absolute right-0.5 top-0.5 w-4 h-4 bg-on-primary rounded-full"></span>
+                <button className={`w-10 h-5 rounded-full relative transition-colors ${showNdvi ? 'bg-primary-container shadow-[0_0_8px_rgba(0,184,148,0.3)]' : 'bg-surface-container-highest border border-outline-variant'}`}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${showNdvi ? 'right-0.5 bg-on-primary' : 'left-0.5 bg-outline-variant'}`}></span>
                 </button>
               </div>
               {/* Opacity Slider */}
@@ -120,20 +195,17 @@ export default function TerrainMaps() {
       </div>
 
       {/* Map View Controls (Bottom Right) */}
-      <div className="absolute bottom-md right-md flex flex-col gap-2 z-20">
+      <div className="absolute bottom-md right-md flex flex-col gap-2 z-[1000]">
         <div className="bg-surface-container-low/90 backdrop-blur-md border border-outline-variant rounded-lg flex flex-col overflow-hidden shadow-lg">
-          <button className="w-10 h-10 flex items-center justify-center text-on-surface hover:bg-surface-variant hover:text-primary transition-colors border-b border-outline-variant">
+          <button onClick={handleZoomIn} className="w-10 h-10 flex items-center justify-center text-on-surface hover:bg-surface-variant hover:text-primary transition-colors border-b border-outline-variant">
             <span className="material-symbols-outlined">add</span>
           </button>
-          <button className="w-10 h-10 flex items-center justify-center text-on-surface hover:bg-surface-variant hover:text-primary transition-colors">
+          <button onClick={handleZoomOut} className="w-10 h-10 flex items-center justify-center text-on-surface hover:bg-surface-variant hover:text-primary transition-colors">
             <span className="material-symbols-outlined">remove</span>
           </button>
         </div>
-        <button className="w-10 h-10 bg-surface-container-low/90 backdrop-blur-md border border-outline-variant rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-variant hover:text-primary transition-colors shadow-lg mt-1">
+        <button onClick={handleRecenter} className="w-10 h-10 bg-surface-container-low/90 backdrop-blur-md border border-outline-variant rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-variant hover:text-primary transition-colors shadow-lg mt-1">
           <span className="material-symbols-outlined">my_location</span>
-        </button>
-        <button className="w-10 h-10 bg-surface-container-low/90 backdrop-blur-md border border-outline-variant rounded-lg flex items-center justify-center text-on-surface hover:bg-surface-variant hover:text-primary transition-colors shadow-lg mt-1">
-          <span className="material-symbols-outlined">layers_clear</span>
         </button>
       </div>
     </div>
