@@ -5,6 +5,8 @@ import TopNav from "./components/layout/TopNav";
 import MissionControl from "./components/dashboard/MissionControl";
 import DroneFleet from "./components/fleet/DroneFleet";
 import TerrainMaps from "./components/maps/TerrainMaps";
+import AiInsights from "./components/ai/AiInsights";
+import SafetyLogs from "./components/logs/SafetyLogs";
 
 function MainLayout() {
   const { activeNav } = useApp();
@@ -20,20 +22,8 @@ function MainLayout() {
           {activeNav === "mission-control" && <MissionControl />}
           {activeNav === "drone-fleet" && <DroneFleet />}
           {activeNav === "terrain-maps" && <TerrainMaps />}
-          {activeNav === "ai-insights" && (
-            <div className="p-lg bg-surface-container rounded-xl border border-surface-variant flex flex-col items-center justify-center text-on-surface-variant h-64">
-              <span className="material-symbols-outlined text-[48px] mb-md opacity-50">psychology</span>
-              <h2 className="font-headline-md font-bold mb-xs text-on-surface">AI Training & Insights</h2>
-              <p>Mô-đun theo dõi quá trình huấn luyện AI.</p>
-            </div>
-          )}
-          {activeNav === "safety-logs" && (
-            <div className="p-lg bg-surface-container rounded-xl border border-surface-variant flex flex-col items-center justify-center text-on-surface-variant h-64">
-              <span className="material-symbols-outlined text-[48px] mb-md opacity-50">security</span>
-              <h2 className="font-headline-md font-bold mb-xs text-on-surface">Safety & Compliance Logs</h2>
-              <p>Lưu trữ nhật ký bay và báo cáo an toàn.</p>
-            </div>
-          )}
+          {activeNav === "ai-insights" && <AiInsights />}
+          {activeNav === "safety-logs" && <SafetyLogs />}
         </main>
       </div>
 
