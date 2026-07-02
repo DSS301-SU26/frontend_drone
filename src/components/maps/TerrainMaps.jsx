@@ -1,32 +1,59 @@
 import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useApp } from "../../context/AppContext";
 
 const SATELLITE_URL = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}";
-const CENTER = [10.45, 106.62]; // Đồng Tháp / Long An area
 
-const plot1Coords = [
-  [10.452, 106.618],
-  [10.452, 106.622],
-  [10.448, 106.622],
-  [10.448, 106.618],
-];
+// Mapping location names to GPS coordinates and demo farm plots
+const LOCATION_MAP = {
+  "Dong Thap": {
+    center: [10.4544, 105.6323],
+    plots: [
+      [[10.456, 105.630], [10.456, 105.634], [10.452, 105.634], [10.452, 105.630]],
+      [[10.452, 105.630], [10.452, 105.634], [10.449, 105.634], [10.449, 105.630]],
+      [[10.456, 105.635], [10.456, 105.640], [10.450, 105.640], [10.450, 105.635]],
+    ],
+  },
+  "Can Tho": {
+    center: [10.0342, 105.7220],
+    plots: [
+      [[10.036, 105.720], [10.036, 105.724], [10.032, 105.724], [10.032, 105.720]],
+      [[10.032, 105.720], [10.032, 105.724], [10.029, 105.724], [10.029, 105.720]],
+      [[10.036, 105.725], [10.036, 105.730], [10.030, 105.730], [10.030, 105.725]],
+    ],
+  },
+  "Long An": {
+    center: [10.5360, 106.4130],
+    plots: [
+      [[10.538, 106.411], [10.538, 106.415], [10.534, 106.415], [10.534, 106.411]],
+      [[10.534, 106.411], [10.534, 106.415], [10.531, 106.415], [10.531, 106.411]],
+      [[10.538, 106.416], [10.538, 106.421], [10.532, 106.421], [10.532, 106.416]],
+    ],
+  },
+  "An Giang": {
+    center: [10.3860, 105.4350],
+    plots: [
+      [[10.388, 105.433], [10.388, 105.437], [10.384, 105.437], [10.384, 105.433]],
+      [[10.384, 105.433], [10.384, 105.437], [10.381, 105.437], [10.381, 105.433]],
+      [[10.388, 105.438], [10.388, 105.443], [10.382, 105.443], [10.382, 105.438]],
+    ],
+  },
+};
 
-const plot2Coords = [
-  [10.448, 106.618],
-  [10.448, 106.622],
-  [10.445, 106.622],
-  [10.445, 106.618],
-];
+const DEFAULT_LOCATION = LOCATION_MAP["Dong Thap"];
 
-const plot3Coords = [
-  [10.452, 106.623],
-  [10.452, 106.628],
-  [10.446, 106.628],
-  [10.446, 106.623],
-];
+function getLocationData(locationId) {
+  // Try exact match first, then partial match
+  if (LOCATION_MAP[locationId]) return LOCATION_MAP[locationId];
+  const key = Object.keys(LOCATION_MAP).find(k => locationId?.toLowerCase().includes(k.toLowerCase()));
+  return key ? LOCATION_MAP[key] : DEFAULT_LOCATION;
+}
 
 export default function TerrainMaps() {
+  const { locationId } = useApp();
+  const locData = getLocationData(locationId);
+
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const boundaryLayerRef = useRef(null);
@@ -37,34 +64,38 @@ export default function TerrainMaps() {
 
   // Initialize leaflet map once
   useEffect(() => {
-    if (mapInstanceRef.current) return; // already initialized
+    if (mapInstanceRef.current) return;
 
     const map = L.map(mapRef.current, {
-      center: CENTER,
+      center: locData.center,
       zoom: 16,
       zoomControl: false,
       attributionControl: false,
     });
 
-    L.tileLayer(SATELLITE_URL, { maxZoom: 19 }).addTo(map);
+    L.tileLayer(SATELLITE_URL, { maxZoom: 20 }).addTo(map);
 
     mapInstanceRef.current = map;
 
-    // Boundary polygons
-    const boundaryGroup = L.layerGroup([
-      L.polygon(plot1Coords, { color: "#4bddb7", fill: false, dashArray: "8 4", weight: 2 }),
-      L.polygon(plot2Coords, { color: "#4bddb7", fill: false, dashArray: "8 4", weight: 2 }),
-      L.polygon(plot3Coords, { color: "#3c4a44", fill: false, dashArray: "8 4", weight: 2 }),
-    ]).addTo(map);
+    // Draw initial layers
+    const plots = locData.plots || [];
+    const boundaryGroup = L.layerGroup(
+      plots.map((coords, i) => L.polygon(coords, {
+        color: i < 2 ? "#4bddb7" : "#3c4a44",
+        fill: false,
+        dashArray: "8 4",
+        weight: 2,
+      }))
+    ).addTo(map);
     boundaryLayerRef.current = boundaryGroup;
 
-    // NDVI overlay
-    const ndviGroup = L.layerGroup([
-      L.polygon(plot3Coords, { color: "transparent", fillColor: "#f0bf63", fillOpacity: 0.5 }),
-    ]).addTo(map);
+    const ndviGroup = L.layerGroup(
+      plots.length > 2
+        ? [L.polygon(plots[2], { color: "transparent", fillColor: "#f0bf63", fillOpacity: 0.5 })]
+        : []
+    ).addTo(map);
     ndviLayerRef.current = ndviGroup;
 
-    // Fix tile rendering on container resize
     setTimeout(() => map.invalidateSize(), 200);
 
     return () => {
@@ -72,6 +103,36 @@ export default function TerrainMaps() {
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Fly to new location and redraw polygons when locationId changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    map.flyTo(locData.center, 16, { duration: 1.5 });
+
+    // Redraw boundary polygons
+    if (boundaryLayerRef.current) {
+      boundaryLayerRef.current.clearLayers();
+      (locData.plots || []).forEach((coords, i) => {
+        L.polygon(coords, {
+          color: i < 2 ? "#4bddb7" : "#3c4a44",
+          fill: false,
+          dashArray: "8 4",
+          weight: 2,
+        }).addTo(boundaryLayerRef.current);
+      });
+    }
+
+    // Redraw NDVI overlay
+    if (ndviLayerRef.current) {
+      ndviLayerRef.current.clearLayers();
+      if (locData.plots?.length > 2) {
+        L.polygon(locData.plots[2], { color: "transparent", fillColor: "#f0bf63", fillOpacity: 0.5 })
+          .addTo(ndviLayerRef.current);
+      }
+    }
+  }, [locationId]);
 
   // Toggle boundary layer
   useEffect(() => {
@@ -99,7 +160,7 @@ export default function TerrainMaps() {
 
   const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
   const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
-  const handleRecenter = () => mapInstanceRef.current?.flyTo(CENTER, 16);
+  const handleRecenter = () => mapInstanceRef.current?.flyTo(locData.center, 16);
 
   return (
     <div className="flex-1 relative w-full h-[calc(100vh-64px)] md:h-full bg-surface-dim overflow-hidden rounded-xl border border-outline-variant">
