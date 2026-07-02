@@ -6,11 +6,16 @@ import { fileURLToPath } from "node:url";
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-let backendRoot = path.resolve(frontendRoot, "../BE/agricultural-drone-scheduler");
+let backendRoot = path.resolve(frontendRoot, "../agricultural-drone-scheduler");
 try {
   await access(backendRoot);
 } catch {
-  backendRoot = path.resolve(frontendRoot, "../../BE_DSS/agricultural-drone-scheduler");
+  try {
+    backendRoot = path.resolve(frontendRoot, "../BE/agricultural-drone-scheduler");
+    await access(backendRoot);
+  } catch {
+    backendRoot = path.resolve(frontendRoot, "../../BE_DSS/agricultural-drone-scheduler");
+  }
 }
 
 const uvicorn = process.platform === "win32"

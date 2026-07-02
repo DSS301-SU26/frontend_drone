@@ -1,0 +1,171 @@
+import { useState, useEffect, useRef } from "react";
+import { useApp } from "../../context/AppContext";
+
+function Dropdown({ id, trigger, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <div onClick={() => setOpen(!open)} className="cursor-pointer">
+        {trigger}
+      </div>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-64 bg-surface-container-high border border-outline-variant rounded-lg shadow-2xl z-50 overflow-hidden">
+          <div className="p-xs flex flex-col" onClick={() => setOpen(false)}>
+            {children}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TopNav() {
+  const {
+    locations, locationId, setLocationId,
+    dashboard, syncing, lastSyncedAt,
+    notificationOpen, setNotificationOpen,
+    mapModalOpen, setMapModalOpen,
+    executePipelineRefresh,
+  } = useApp();
+
+  const currentLocation = locations.find((l) => l.id === locationId);
+
+  return (
+    <header className="flex justify-between items-center w-full px-margin-desktop py-sm sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-outline-variant">
+      {/* Left: Brand */}
+      <div className="flex items-center gap-sm">
+        <span
+          className="material-symbols-outlined text-primary text-[32px]"
+          style={{ fontVariationSettings: "'FILL' 1" }}
+        >
+          flight_takeoff
+        </span>
+        <span className="font-display-lg text-headline-md font-bold text-primary tracking-tight">
+          AeroGuard Pro
+        </span>
+      </div>
+
+      {/* Center: Selectors */}
+      <div className="flex items-center gap-md">
+        {/* Garden Selector */}
+        <Dropdown
+          id="garden"
+          trigger={
+            <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm hover:border-outline transition-colors hover:bg-surface-variant">
+              <span className="material-symbols-outlined text-on-surface-variant">park</span>
+              <span className="font-label-caps text-label-caps text-on-surface">
+                {currentLocation?.name ?? locationId}
+              </span>
+              <span className="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
+            </div>
+          }
+        >
+          {locations.map((loc) => {
+            const isActive = loc.id === locationId;
+            return (
+              <div
+                key={loc.id}
+                onClick={() => setLocationId(loc.id)}
+                className={`flex items-center justify-between px-md py-sm rounded-sm cursor-pointer transition-colors ${
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "hover:bg-surface-variant text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                <span className="font-label-caps text-label-caps">{loc.name}</span>
+                {isActive && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Hoạt động</span>
+                )}
+              </div>
+            );
+          })}
+        </Dropdown>
+
+        {/* Map Button */}
+        <button
+          className="p-xs bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-variant transition-colors text-primary"
+          onClick={() => setMapModalOpen(true)}
+        >
+          <span className="material-symbols-outlined">map</span>
+        </button>
+
+        <div className="w-px h-6 bg-outline-variant mx-xs"></div>
+
+        {/* Drone Selector */}
+        <Dropdown
+          id="drone"
+          trigger={
+            <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm hover:border-outline transition-colors hover:bg-surface-variant">
+              <span className="material-symbols-outlined text-on-surface-variant">flight</span>
+              <div className="flex items-center gap-xs">
+                <div className="w-2 h-2 rounded-full bg-primary"></div>
+                <span className="font-label-caps text-label-caps text-on-surface">DJI Agras T30</span>
+              </div>
+              <span className="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
+            </div>
+          }
+        >
+          <div className="flex items-center justify-between px-md py-sm bg-primary/10 text-primary rounded-sm cursor-pointer">
+            <div className="flex items-center gap-sm">
+              <span className="material-symbols-outlined text-[18px]">check_circle</span>
+              <span className="font-label-caps text-label-caps">DJI Agras T30</span>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Sẵn sàng</span>
+          </div>
+          <div className="flex items-center justify-between px-md py-sm hover:bg-surface-variant text-on-surface-variant hover:text-on-surface rounded-sm transition-colors cursor-pointer">
+            <div className="flex items-center gap-sm">
+              <span className="material-symbols-outlined text-[18px]">flight</span>
+              <span className="font-label-caps text-label-caps">DJI Agras T40</span>
+            </div>
+            <span className="text-[10px] opacity-60 uppercase tracking-wider">Đang bay</span>
+          </div>
+          <div className="flex items-center justify-between px-md py-sm hover:bg-surface-variant text-on-surface-variant hover:text-on-surface rounded-sm transition-colors cursor-pointer">
+            <div className="flex items-center gap-sm">
+              <span className="material-symbols-outlined text-[18px]">battery_charging_full</span>
+              <span className="font-label-caps text-label-caps">XAG P100 Pro</span>
+            </div>
+            <span className="text-[10px] opacity-60 uppercase tracking-wider">Đang sạc</span>
+          </div>
+        </Dropdown>
+
+        {/* Sync button */}
+        <button
+          className="p-xs bg-surface-container border border-outline-variant rounded-lg hover:bg-surface-variant transition-colors text-primary disabled:opacity-50"
+          disabled={syncing}
+          onClick={() => executePipelineRefresh(true)}
+          title="Đồng bộ dữ liệu thời tiết"
+        >
+          <span className={`material-symbols-outlined ${syncing ? "animate-spin" : ""}`}>sync</span>
+        </button>
+      </div>
+
+      {/* Right: Actions */}
+      <div className="flex items-center gap-md">
+        <div className="flex gap-xs">
+          <button
+            className="p-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-full transition-all duration-200 relative"
+            onClick={() => setNotificationOpen(!notificationOpen)}
+          >
+            <span className="material-symbols-outlined">notifications</span>
+          </button>
+          <button className="p-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-full transition-all duration-200">
+            <span className="material-symbols-outlined">settings</span>
+          </button>
+        </div>
+        <div className="w-8 h-8 rounded-full border border-outline-variant overflow-hidden cursor-pointer bg-surface-container-high flex items-center justify-center text-primary text-sm font-bold">
+          OP
+        </div>
+      </div>
+    </header>
+  );
+}

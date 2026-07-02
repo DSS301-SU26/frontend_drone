@@ -1,0 +1,187 @@
+import { useApp } from "../../context/AppContext";
+import { formatDateTime, formatNumber, formatVisibility, translateWeatherDescription } from "../../utils/helpers";
+
+export default function WeatherTimeline() {
+  const {
+    dashboard, slots, selectedSlot, setSelectedSlot,
+    slotViewMode, setSlotViewMode, current,
+  } = useApp();
+
+  const targetSlot = current;
+  const visibilityText = formatVisibility(targetSlot?.visibility);
+  const weatherDescription = translateWeatherDescription(targetSlot?.weather_description);
+  const precipitationText = targetSlot?.precipitation > 0
+    ? `Lượng mưa ${formatNumber(targetSlot.precipitation)} mm`
+    : "Chưa ghi nhận mưa";
+
+  const weatherMetrics = [
+    { label: "Nhiệt độ", value: targetSlot?.temperature, unit: "°C", icon: "device_thermostat", colorClass: "text-[#E5A85A]", borderClass: "border-[#3A2D1F]", note: weatherDescription },
+    { label: "Tốc độ gió", value: targetSlot?.wind_speed, unit: "", icon: "air", colorClass: "text-[#5A9EE5]", borderClass: "border-[#1F2F3A]", note: `Gió giật ${formatNumber(targetSlot?.wind_gust)} km/h` },
+    { label: "Độ ẩm", value: targetSlot?.humidity, unit: "%", icon: "water_drop", colorClass: "text-primary", borderClass: "border-[#1F3A3A]", note: `Mây ${formatNumber(targetSlot?.cloud_cover)}% - ${visibilityText}` },
+    { label: "Khả năng mưa", value: targetSlot?.rain_probability, unit: "%", icon: "rainy", colorClass: "text-[#B45AE5]", borderClass: "border-[#2D1F3A]", note: precipitationText },
+    { label: "Bốc hơi nước", value: targetSlot?.evapotranspiration != null ? formatNumber(targetSlot.evapotranspiration) : "0", unit: " ET₀", icon: "ev_station", colorClass: "text-[#5AE58E]", borderClass: "border-[#1F3A2D]", note: "Chỉ số bốc hơi nước" },
+    { label: "Độ ẩm đất", value: targetSlot?.soil_moisture != null ? formatNumber(targetSlot.soil_moisture) : "0.5", unit: "%", icon: "grass", colorClass: "text-[#C5E55A]", borderClass: "border-[#333A1F]", note: "Độ ẩm tầng đất 0-7cm" },
+  ];
+
+  if (!dashboard) return null;
+
+  return (
+    <div className="col-span-1 md:col-span-8 bg-surface-container rounded-xl border border-surface-variant p-lg flex flex-col gap-md">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="font-label-caps text-primary text-label-caps uppercase tracking-wider mb-base">THÔNG TIN VI KHÍ HẬU & LỊCH TRÌNH</h2>
+          <h3 className="font-headline-md text-headline-md font-bold">Thời tiết từng khung giờ bay</h3>
+        </div>
+        <div className="flex gap-sm">
+          <button
+            className={`px-md py-xs rounded font-label-caps text-label-caps font-bold transition-colors ${
+              slotViewMode === "timeline" ? "bg-primary text-on-primary-container" : "bg-surface-bright text-on-surface border border-outline-variant hover:bg-surface-variant"
+            }`}
+            onClick={() => setSlotViewMode("timeline")}
+          >
+            Đồng thời gian
+          </button>
+          <button
+            className={`px-md py-xs rounded font-label-caps text-label-caps font-bold transition-colors ${
+              slotViewMode === "grid" ? "bg-primary text-on-primary-container" : "bg-surface-bright text-on-surface border border-outline-variant hover:bg-surface-variant"
+            }`}
+            onClick={() => setSlotViewMode("grid")}
+          >
+            Bảng tổng quan cả ngày
+          </button>
+          <div className="flex items-center gap-xs bg-surface-bright border border-outline-variant px-sm py-xs rounded">
+            <div className="w-2 h-2 rounded-full bg-primary"></div>
+            <span className="font-body-md text-body-md text-on-surface-variant text-sm">
+              Đồng bộ: {formatDateTime(dashboard.source?.updated_at)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {slotViewMode === "timeline" ? (
+        <>
+          {/* Timeline */}
+          <div className="flex gap-sm overflow-x-auto timeline-scroll pb-sm">
+        {slots.map((slot, index) => {
+          const isSelected = selectedSlot === index;
+          return (
+            <button
+              key={slot.timestamp}
+              onClick={() => setSelectedSlot(index)}
+              className={`flex-shrink-0 w-32 rounded-lg p-sm border transition-all ${
+                isSelected
+                  ? "bg-primary-container text-on-primary-container border-primary"
+                  : "bg-surface text-on-surface-variant border-outline-variant hover:border-outline"
+              }`}
+            >
+              <div className={`text-sm mb-xs ${isSelected ? "font-bold" : ""}`}>{slot.time}</div>
+              <div className="flex justify-between items-end">
+                <span className={isSelected ? "font-headline-sm text-headline-sm font-bold" : "font-body-lg text-body-lg"}>
+                  {slot.temperature}°C
+                </span>
+                <span className="material-symbols-outlined text-[16px]">
+                  {slot.rain_probability > 60 ? "rainy" : slot.cloud_cover > 70 ? "cloud" : slot.temperature > 32 ? "sunny" : "partly_cloudy_day"}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+        </>
+      ) : (
+        <div className="overflow-x-auto bg-surface-container-lowest border border-outline-variant rounded-lg mt-sm flex-1 max-h-[400px] timeline-scroll">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead className="sticky top-0 z-10">
+              <tr className="border-b border-outline-variant bg-surface-container">
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold">Khung giờ</th>
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold">Khả năng bay</th>
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold">AI Khuyến nghị</th>
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">AI Đồng thuận</th>
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">Chu kỳ pin</th>
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">Quyết định QTV</th>
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">Chi tiết</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slots.map((slot, index) => {
+                const isSelected = selectedSlot === index;
+                const flyScore = slot.decision_engine?.flyability_score ?? 0;
+                const scorePercent = Math.round(flyScore * 100);
+                const isHighRisk = flyScore < 0.50;
+                const riskColor = isHighRisk ? "#ff4a4a" : flyScore >= 0.80 ? "#4bddb7" : "#f0bf63";
+                const actionLabel = slot.decision_engine?.final_decision === "TAKE_OFF" ? "Cất cánh" :
+                                   slot.decision_engine?.final_decision === "RETURN_TO_CHARGING" ? "Về trạm sạc" :
+                                   slot.decision_engine?.final_decision === "LOCK_SPRAY" ? "Khóa phun" : "Hoãn bay";
+                const actionBg = slot.decision_engine?.final_decision === "TAKE_OFF" ? "border-[#1c4a2d] text-[#4bddb7]" : 
+                               slot.decision_engine?.final_decision === "RETURN_TO_CHARGING" ? "border-[#4a1c1c] text-[#ff4a4a]" :
+                               slot.decision_engine?.final_decision === "LOCK_SPRAY" ? "border-[#4a1c1c] text-[#ff4a4a]" : "border-[#4a3f1c] text-[#f0bf63]";
+                const isConsensus = !slot.decision_engine?.was_conflict;
+                const wasOverridden = slot.was_human_overridden;
+
+                return (
+                  <tr key={slot.timestamp} className={`border-b border-outline-variant hover:bg-surface transition-colors cursor-pointer ${isSelected ? "bg-surface-container-high" : ""}`} onClick={() => setSelectedSlot(index)}>
+                    <td className="p-sm font-data-mono text-[13px] text-on-surface-variant leading-tight">
+                      <div className="font-bold text-on-surface">{slot.time} -</div>
+                      <div>{slot.end_time}</div>
+                    </td>
+                    <td className="p-sm">
+                      <div className="flex items-center gap-sm">
+                        <div className="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${scorePercent}%`, backgroundColor: riskColor }}></div>
+                        </div>
+                        <span className="font-data-mono text-[12px] font-bold" style={{ color: riskColor }}>{scorePercent}%</span>
+                      </div>
+                    </td>
+                    <td className="p-sm">
+                      <span className={`px-2 py-1 rounded border ${actionBg} text-[11px] font-bold`}>{actionLabel}</span>
+                    </td>
+                    <td className="p-sm text-center">
+                      {isConsensus ? (
+                        <span className="px-2 py-1 rounded border border-[#1c4a2d] text-primary text-[11px] font-bold">Đồng thuận</span>
+                      ) : (
+                        <span className="px-2 py-1 rounded border border-[#4a3f1c] text-[#f0bf63] text-[11px] font-bold">Xung đột</span>
+                      )}
+                    </td>
+                    <td className="p-sm text-center font-data-mono font-bold text-sm text-on-surface">0</td>
+                    <td className="p-sm text-center">
+                      {wasOverridden ? (
+                        <span className="material-symbols-outlined text-secondary text-[16px]">how_to_reg</span>
+                      ) : (
+                        <span className="text-on-surface-variant">-</span>
+                      )}
+                    </td>
+                    <td className="p-sm text-center">
+                      <button className="flex items-center justify-center gap-1 mx-auto px-2 py-1 rounded border border-outline-variant bg-surface hover:bg-surface-container-high text-[11px] text-on-surface font-bold transition-colors">
+                        <span className="material-symbols-outlined text-[14px]">visibility</span> Xem
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-sm mt-sm">
+        {weatherMetrics.map(({ label, value, unit, icon, colorClass, borderClass, note }) => (
+          <div key={label} className={`bg-surface border ${borderClass} p-sm rounded-lg flex flex-col justify-between h-24`}>
+            <div className={`flex items-center gap-xs ${colorClass}`}>
+              <span className="material-symbols-outlined text-[16px]">{icon}</span>
+              <span className="font-label-caps text-[10px] uppercase">{label}</span>
+            </div>
+            <div>
+              <div className="flex items-baseline gap-xs">
+                <span className="font-display-lg text-[24px] font-bold">{value ?? "--"}</span>
+                {unit && <span className="text-on-surface-variant text-sm">{unit}</span>}
+              </div>
+              <div className="text-on-surface-variant text-[11px] truncate" title={note}>{note}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

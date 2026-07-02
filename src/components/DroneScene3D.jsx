@@ -268,15 +268,19 @@ export default function DroneScene3D({
   }, [onOpenDrone]);
 
   return (
-    <div className={`field-map three-field-map scene-${weather.type}`} ref={mountRef}>
-      <div className="three-overlay top-left">{children}</div>
-      <div className="three-controls">
-        <span><Rotate3D size={13} /> Kéo để xoay</span>
-        <span><ZoomIn size={13} /> Cuộn để zoom</span>
-        <span><MousePointer2 size={13} /> Click UAV</span>
+    <div className={`relative w-full h-full cursor-move scene-${weather.type}`} ref={mountRef}>
+      {children && (
+        <div className="absolute top-sm left-sm z-10 pointer-events-auto">{children}</div>
+      )}
+      <div className="absolute bottom-2 left-2 flex flex-col gap-1 text-[10px] text-on-surface-variant font-data-mono pointer-events-none opacity-80 drop-shadow-md">
+        <span className="flex items-center gap-1"><Rotate3D size={11} /> Kéo xoay</span>
+        <span className="flex items-center gap-1"><ZoomIn size={11} /> Cuộn zoom</span>
       </div>
-      <a className="google-map-link" href={mapsUrl} target="_blank" rel="noreferrer">
-        <ExternalLink size={13} /> Mở Google Maps
+      <a 
+        className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] text-primary hover:text-primary-fixed bg-surface-container-highest/80 backdrop-blur px-2 py-1 rounded font-bold transition-colors pointer-events-auto border border-outline-variant"
+        href={mapsUrl} target="_blank" rel="noreferrer"
+      >
+        <ExternalLink size={11} /> Maps
       </a>
     </div>
   );
