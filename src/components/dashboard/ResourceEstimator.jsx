@@ -5,9 +5,9 @@ export default function ResourceEstimator() {
   const { current, farmSize, setFarmSize } = useApp();
 
   const totalLiters = current?.decision_engine?.resource_regressor?.total_liters ?? 150;
-  const sorties = current?.decision_engine?.resource_regressor?.sorties ?? 5;
-  const cropType = "Sầu riêng (Durian)";
-  const chemicalType = "Anvil 5SC";
+  const cropType = "Lúa (Rice)";
+  const { pesticide } = useApp();
+  const chemicalType = pesticide;
 
   return (
     <div className="col-span-1 md:col-span-4 bg-surface-container rounded-xl border border-surface-variant p-lg flex flex-col gap-md">
@@ -48,13 +48,6 @@ export default function ResourceEstimator() {
           <div className="flex items-center gap-xs">
             <span className="font-display-lg text-[20px] font-bold text-on-surface">{formatNumber(totalLiters)}</span>
             <span className="font-body-md text-sm text-on-surface-variant">Lít</span>
-          </div>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="font-body-md text-sm text-on-surface-variant">Số chuyến bay (ước tính)</span>
-          <div className="flex items-center gap-xs">
-            <span className="font-display-lg text-[20px] font-bold text-on-surface">{sorties}</span>
-            <span className="font-body-md text-sm text-on-surface-variant">Chuyến</span>
           </div>
         </div>
       </div>

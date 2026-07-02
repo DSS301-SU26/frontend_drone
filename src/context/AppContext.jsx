@@ -12,6 +12,7 @@ import {
   trainAiModel,
   askChatbot,
   overrideDecision,
+  getDronesList,
 } from "../api/dashboard";
 import {
   actionConfig,
@@ -38,6 +39,7 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   // === Core Data State ===
   const [locations, setLocations] = useState([]);
+  const [droneList, setDroneList] = useState([]);
   const [locationId, setLocationId] = useState("Dong Thap");
   const [dashboard, setDashboard] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(0);
@@ -67,6 +69,9 @@ export function AppProvider({ children }) {
   const [farmSize, setFarmSize] = useState(10.0);
   const [distanceKm, setDistanceKm] = useState(1.0);
   const [mapModalOpen, setMapModalOpen] = useState(false);
+  const [droneModel, setDroneModel] = useState("DJI_T30");
+  const [pesticide, setPesticide] = useState("Tricyclazole");
+  const [cropStage, setCropStage] = useState("TILLERING");
 
   // === Chatbot State ===
   const [chatOpen, setChatOpen] = useState(false);
@@ -98,7 +103,7 @@ export function AppProvider({ children }) {
     setSyncing(true);
     setError("");
     try {
-      const payload = await getDashboardSlots(locationId, null, farmSize, distanceKm);
+      const payload = await getDashboardSlots(locationId, null, farmSize, distanceKm, droneModel, pesticide, cropStage);
       setDashboard(payload);
       if (!keepSelected) {
         setSelectedSlot(0);
@@ -115,7 +120,7 @@ export function AppProvider({ children }) {
     } finally {
       setSyncing(false);
     }
-  }, [locationId, farmSize, distanceKm, notify]);
+  }, [locationId, farmSize, distanceKm, droneModel, pesticide, cropStage, notify]);
 
   const executePipelineRefresh = useCallback(async (showToast = true) => {
     setSyncing(true);
@@ -170,6 +175,7 @@ export function AppProvider({ children }) {
   // === Effects ===
   useEffect(() => {
     getLocations().then(setLocations).catch((e) => setError(e.message));
+    getDronesList().then(setDroneList).catch((e) => setError(e.message));
     getDecisionConfig()
       .then((config) => { setDecisionConfig(config); setRuleForm(config.thresholds ?? {}); })
       .catch((e) => setError(e.message));
@@ -307,11 +313,34 @@ export function AppProvider({ children }) {
   // === Override handlers ===
   const handleOverrideDecision = async (e) => {
     e?.preventDefault();
-    if (!current?.id) { notify("Lỗi: Không tìm thấy ID cho bản ghi này."); return; }
     if (!overrideDecisionValue) { notify("Vui lòng chọn quyết định ghi đè."); return; }
     setSubmittingOverride(true);
     try {
-      await overrideDecision(current.id, overrideDecisionValue, overrideNotes, farmSize, true, distanceKm);
+      const rawWeather = {
+        temperature_2m: current.weather?.temperature || 0,
+        relative_humidity_2m: current.weather?.humidity || 0,
+        precipitation: current.weather?.precipitation || 0,
+        precipitation_probability: current.weather?.precipitation_probability || current.weather?.rain_probability || 0,
+        wind_speed_10m: current.weather?.wind_speed || 0,
+        wind_gusts_10m: current.weather?.wind_gust || 0,
+        cloud_cover: current.weather?.cloud_cover || 0,
+        visibility: current.weather?.visibility || 10000,
+        weather_code: current.weather?.weather_code || 0,
+        et0_fao_evapotranspiration: current.weather?.evapotranspiration || 0,
+        soil_moisture_0_to_7cm: current.weather?.soil_moisture || 0,
+        timestamp: current.timestamp || new Date().toISOString()
+      };
+
+      await overrideDecision({
+        reason: `${overrideDecisionValue}: ${overrideNotes}`,
+        weather: rawWeather,
+        drone_model: current.drone_model || "DJI_T30",
+        pesticide: current.pesticide || null,
+        crop_stage: current.crop_stage || null,
+        hour: current.hour || null,
+        plot_id: current.plot_id || null,
+        mission_id: current.mission_id || null
+      });
       notify("Đã cập nhật ghi đè quyết định thành công.");
       setIsOverriding(false);
       setOverrideNotes("");
@@ -328,7 +357,11 @@ export function AppProvider({ children }) {
     setSubmittingOverride(true);
     try {
       const aiDecision = current.decision_engine?.champion_score > 0.80 ? "TAKE_OFF" : "DELAY_FLIGHT";
-      await overrideDecision(current.id, aiDecision, "", farmSize, false, distanceKm);
+      await overrideDecision(current.id, {
+        override_decision: aiDecision,
+        user_notes: "",
+        was_human_overridden: false
+      });
       notify("Đã khôi phục quyết định đề xuất từ AI.");
       setIsOverriding(false);
       setOverrideNotes("");
@@ -359,7 +392,7 @@ export function AppProvider({ children }) {
 
   const value = {
     // Data
-    locations, locationId, setLocationId, dashboard, slots, current, action, activeRisk,
+    locations, locationId, setLocationId, droneList, setDroneList, dashboard, slots, current, action, activeRisk,
     selectedSlot, setSelectedSlot, activeNav, setActiveNav, timelineTiles, analytics,
     operationTimestamp, setOperationTimestamp, operationTile, nextSafeSlot,
     canSchedule, decisionConfig, activeDecisionConfig, ruleForm, ruleSourceLabel,
@@ -373,6 +406,7 @@ export function AppProvider({ children }) {
     missionOpen, setMissionOpen, mapModalOpen, setMapModalOpen,
     toast, error, syncing, savingRules, lastSyncedAt,
     slotViewMode, setSlotViewMode, farmSize, setFarmSize, distanceKm, setDistanceKm,
+    droneModel, setDroneModel, pesticide, setPesticide, cropStage, setCropStage,
     // Chat
     chatOpen, setChatOpen, chatHistory, chatInput, setChatInput, isChatLoading, handleSendChatMessage,
     // Override

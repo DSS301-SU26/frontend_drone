@@ -14,15 +14,52 @@ export function getLocations() {
   return request("/api/locations");
 }
 
-export function getDashboardSlots(location, at = null, farmSize = 10.0, distanceKm = 1.0) {
+export function getDronesList() {
+  return request("/api/drones");
+}
+
+export function addDrone(dronePayload) {
+  return request("/api/drones", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dronePayload),
+  });
+}
+
+export function deleteDrone(droneId) {
+  return request(`/api/drones/${droneId}`, {
+    method: "DELETE",
+  });
+}
+
+export function getDashboardSlots(location, at = null, farmSize = 10.0, distanceKm = 1.0, droneModel = "DJI_T30", pesticide = "Tricyclazole", cropStage = "TILLERING") {
   const params = new URLSearchParams({
     location,
     farm_size_ha: farmSize.toString(),
     distance_km: distanceKm.toString(),
+    drone_model: droneModel,
+    pesticide: pesticide,
+    crop_stage: cropStage,
     refresh: Date.now().toString(),
   });
   if (at) params.set("at", at);
   return request(`/api/dashboard/slots?${params.toString()}`);
+}
+
+export function editDrone(droneId, payload) {
+  return request(`/api/drones/${encodeURIComponent(droneId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function overrideDecision(payload) {
+  return request(`/api/decision/override`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
 }
 
 export function askChatbot(question) {
@@ -83,16 +120,4 @@ export function runPipeline({ days = 3, skipUpload = false } = {}) {
   return request(`/api/pipeline/run?${params.toString()}`, { method: "POST" });
 }
 
-export function overrideDecision(id, decision, notes = "", farmSize = 10.0, wasHumanOverridden = true, distanceToFieldKm = 1.0) {
-  return request(`/api/decisions/${id}/override`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      override_decision: decision,
-      user_notes: notes,
-      farm_size_ha: farmSize,
-      was_human_overridden: wasHumanOverridden,
-      distance_to_field_km: distanceToFieldKm,
-    }),
-  });
-}
+

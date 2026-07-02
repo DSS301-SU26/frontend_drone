@@ -35,7 +35,8 @@ export default function TopNav() {
     dashboard, syncing, lastSyncedAt,
     notificationOpen, setNotificationOpen,
     mapModalOpen, setMapModalOpen,
-    executePipelineRefresh,
+    executePipelineRefresh, droneList,
+    droneModel, setDroneModel, pesticide, setPesticide, cropStage, setCropStage,
   } = useApp();
 
   const currentLocation = locations.find((l) => l.id === locationId);
@@ -108,34 +109,74 @@ export default function TopNav() {
             <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm hover:border-outline transition-colors hover:bg-surface-variant">
               <span className="material-symbols-outlined text-on-surface-variant">flight</span>
               <div className="flex items-center gap-xs">
-                <div className="w-2 h-2 rounded-full bg-primary"></div>
-                <span className="font-label-caps text-label-caps text-on-surface">DJI Agras T30</span>
+                <span className="font-label-caps text-label-caps text-on-surface">{droneModel}</span>
               </div>
               <span className="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
             </div>
           }
         >
-          <div className="flex items-center justify-between px-md py-sm bg-primary/10 text-primary rounded-sm cursor-pointer">
-            <div className="flex items-center gap-sm">
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-              <span className="font-label-caps text-label-caps">DJI Agras T30</span>
+          {(droneList.length > 0 ? droneList.map(d => d.model_name) : ["DJI_T30", "DJI_T50", "XAG_P100_PRO"]).map((model) => (
+            <div
+              key={model}
+              onClick={() => setDroneModel(model)}
+              className={`flex items-center justify-between px-md py-sm rounded-sm transition-colors cursor-pointer ${
+                model === droneModel ? "bg-primary/10 text-primary" : "hover:bg-surface-variant text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              <div className="flex items-center gap-sm">
+                <span className="material-symbols-outlined text-[18px]">flight</span>
+                <span className="font-label-caps text-label-caps">{model}</span>
+              </div>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-wider">Sẵn sàng</span>
-          </div>
-          <div className="flex items-center justify-between px-md py-sm hover:bg-surface-variant text-on-surface-variant hover:text-on-surface rounded-sm transition-colors cursor-pointer">
-            <div className="flex items-center gap-sm">
-              <span className="material-symbols-outlined text-[18px]">flight</span>
-              <span className="font-label-caps text-label-caps">DJI Agras T40</span>
+          ))}
+        </Dropdown>
+
+        {/* Pesticide Selector */}
+        <Dropdown
+          id="pesticide"
+          trigger={
+            <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm hover:border-outline transition-colors hover:bg-surface-variant">
+              <span className="material-symbols-outlined text-on-surface-variant">science</span>
+              <span className="font-label-caps text-label-caps text-on-surface">{pesticide}</span>
+              <span className="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
             </div>
-            <span className="text-[10px] opacity-60 uppercase tracking-wider">Đang bay</span>
-          </div>
-          <div className="flex items-center justify-between px-md py-sm hover:bg-surface-variant text-on-surface-variant hover:text-on-surface rounded-sm transition-colors cursor-pointer">
-            <div className="flex items-center gap-sm">
-              <span className="material-symbols-outlined text-[18px]">battery_charging_full</span>
-              <span className="font-label-caps text-label-caps">XAG P100 Pro</span>
+          }
+        >
+          {["Tricyclazole", "Abamectin", "Hexaconazole"].map((chem) => (
+            <div
+              key={chem}
+              onClick={() => setPesticide(chem)}
+              className={`flex items-center justify-between px-md py-sm rounded-sm transition-colors cursor-pointer ${
+                chem === pesticide ? "bg-primary/10 text-primary" : "hover:bg-surface-variant text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              <span className="font-label-caps text-label-caps">{chem}</span>
             </div>
-            <span className="text-[10px] opacity-60 uppercase tracking-wider">Đang sạc</span>
-          </div>
+          ))}
+        </Dropdown>
+
+        {/* Crop Stage Selector */}
+        <Dropdown
+          id="cropStage"
+          trigger={
+            <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm hover:border-outline transition-colors hover:bg-surface-variant">
+              <span className="material-symbols-outlined text-on-surface-variant">grass</span>
+              <span className="font-label-caps text-label-caps text-on-surface">{cropStage}</span>
+              <span className="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
+            </div>
+          }
+        >
+          {["SEEDLING", "TILLERING", "BOOTING", "MATURITY"].map((stage) => (
+            <div
+              key={stage}
+              onClick={() => setCropStage(stage)}
+              className={`flex items-center justify-between px-md py-sm rounded-sm transition-colors cursor-pointer ${
+                stage === cropStage ? "bg-primary/10 text-primary" : "hover:bg-surface-variant text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              <span className="font-label-caps text-label-caps">{stage}</span>
+            </div>
+          ))}
         </Dropdown>
 
         {/* Sync button */}

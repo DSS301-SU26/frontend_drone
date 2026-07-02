@@ -82,6 +82,29 @@ export default function RecommendationPanel() {
           </button>
         )}
 
+        <div className="flex gap-2 w-full mt-2">
+          {!current?.was_human_overridden ? (
+            <button
+              onClick={() => setIsOverriding(true)}
+              className="flex-1 bg-surface-container-high border border-outline-variant hover:border-outline text-on-surface py-xs rounded-lg font-label-caps text-label-caps flex justify-center items-center gap-xs transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px]">edit_note</span>
+              Ghi đè AI
+            </button>
+          ) : (
+            <button
+              onClick={handleRevertToAi}
+              disabled={submittingOverride}
+              className="flex-1 bg-primary/20 border border-primary/50 text-primary py-xs rounded-lg font-label-caps text-label-caps flex justify-center items-center gap-xs transition-colors"
+            >
+              <span className={`material-symbols-outlined text-[14px] ${submittingOverride ? 'animate-spin' : ''}`}>
+                {submittingOverride ? 'sync' : 'restore'}
+              </span>
+              Khôi phục AI
+            </button>
+          )}
+        </div>
+
         {!isSafe && current?.decision_engine?.xai_alert && (
           <div className="flex items-start gap-sm mt-xs text-[11px]" style={{ color: riskColor }}>
             <span className="material-symbols-outlined text-[14px]">error</span>
@@ -89,6 +112,58 @@ export default function RecommendationPanel() {
           </div>
         )}
       </div>
+
+      {/* Override Modal */}
+      {isOverriding && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="bg-surface-container border border-outline-variant rounded-xl p-lg w-full max-w-md shadow-2xl flex flex-col gap-md">
+            <h3 className="font-headline-sm text-on-surface font-bold">Ghi đè Quyết định AI</h3>
+            <p className="text-body-sm text-on-surface-variant">Lưu ý: Bạn đang thực hiện quyền Override logic của Engine 3 lớp.</p>
+            
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-caps text-on-surface-variant">Quyết định mới</label>
+              <select 
+                value={overrideDecisionValue}
+                onChange={(e) => setOverrideDecisionValue(e.target.value)}
+                className="bg-surface-container-highest border border-outline-variant text-on-surface rounded p-sm w-full outline-none focus:border-primary"
+              >
+                <option value="">-- Chọn quyết định --</option>
+                <option value="TAKE_OFF">Cất cánh (Bỏ qua cảnh báo)</option>
+                <option value="DELAY_FLIGHT">Hoãn bay</option>
+                <option value="LOCK_SPRAY">Khóa phun</option>
+                <option value="RETURN_TO_CHARGING">Quay về trạm</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-xs">
+              <label className="font-label-caps text-on-surface-variant">Lý do ghi đè (Bắt buộc)</label>
+              <textarea 
+                value={overrideNotes}
+                onChange={(e) => setOverrideNotes(e.target.value)}
+                className="bg-surface-container-highest border border-outline-variant text-on-surface rounded p-sm w-full h-24 outline-none focus:border-primary resize-none"
+                placeholder="Ví dụ: Đã kiểm tra thực tế, gió giật thấp hơn cảm biến báo..."
+              ></textarea>
+            </div>
+
+            <div className="flex justify-end gap-sm mt-sm">
+              <button 
+                onClick={() => setIsOverriding(false)}
+                className="px-md py-xs rounded font-label-caps text-on-surface hover:bg-surface-container-highest"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={handleOverrideDecision}
+                disabled={!overrideDecisionValue || !overrideNotes || submittingOverride}
+                className="px-md py-xs rounded font-label-caps bg-primary text-on-primary hover:bg-primary-fixed disabled:opacity-50 flex items-center gap-1"
+              >
+                {submittingOverride && <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>}
+                Xác nhận Ghi đè
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
