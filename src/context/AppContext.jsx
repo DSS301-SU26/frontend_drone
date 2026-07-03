@@ -379,16 +379,12 @@ export function AppProvider({ children }) {
     // Slots duoc tinh lai moi moi lan load -> khoi phuc AI = reset UI + reload
     setSubmittingOverride(true);
     try {
-<<<<<<< HEAD
       const aiDecision = current.decision_engine?.champion_score > 0.80 ? "FLY" : "DELAY";
       await overrideDecision(current.id, {
         override_decision: aiDecision,
         user_notes: "",
         was_human_overridden: false
       });
-      notify("Đã khôi phục quyết định đề xuất từ AI.");
-=======
->>>>>>> origin/main
       setIsOverriding(false);
       setOverrideNotes("");
       setOverrideDecisionValue("");
