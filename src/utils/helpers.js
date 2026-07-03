@@ -1,14 +1,14 @@
 export const DAILY_SYNC_KEY = "agriflight:last-daily-sync";
 
 export const actionConfig = {
-  TAKE_OFF: {
+  FLY: {
     title: "Có thể cất cánh",
     short: "Cất cánh",
     risk: "Thấp",
     tone: "healthy",
     description: "Điều kiện thời tiết nằm trong ngưỡng vận hành. UAV có thể thực hiện nhiệm vụ theo kế hoạch.",
   },
-  DELAY_FLIGHT: {
+  DELAY: {
     title: "Nên hoãn chuyến bay",
     short: "Hoãn bay",
     risk: "Trung bình",
@@ -22,7 +22,7 @@ export const actionConfig = {
     tone: "dry",
     description: "Gió hoặc gió giật đã vượt ngưỡng an toàn. Khóa phun giúp tránh trôi dạt hóa chất và mất ổn định UAV.",
   },
-  RETURN_TO_CHARGING: {
+  NO_FLY: {
     title: "Đưa UAV về trạm sạc",
     short: "Về trạm sạc",
     risk: "Cao",
@@ -58,11 +58,11 @@ export function translateRiskLevel(risk) {
 export function getDecisionAction(slot) {
   const score = slot.decision_engine?.flyability_score ?? 0;
   const isSafe = slot.decision_engine?.is_safe_to_fly;
-  if (isSafe || score > 0.80) return "TAKE_OFF";
+  if (isSafe || score > 0.80) return "FLY";
   const rainProb = slot.weather?.precipitation_probability ?? 0;
   const rainAmt = slot.weather?.precipitation ?? 0;
-  if (rainProb >= 50 || rainAmt > 0) return "RETURN_TO_CHARGING";
-  if (score >= 0.50) return "DELAY_FLIGHT";
+  if (rainProb >= 50 || rainAmt > 0) return "NO_FLY";
+  if (score >= 0.50) return "DELAY";
   return "LOCK_SPRAY";
 }
 
@@ -110,7 +110,7 @@ export function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSy
       visibility: slot.weather?.visibility,
       weather_description: slot.weather?.weather_description,
       decision_action: slot.decision_engine?.final_decision,
-      schedule_eligible: slot.decision_engine?.final_decision === "TAKE_OFF",
+      schedule_eligible: slot.decision_engine?.final_decision === "FLY",
       risk_level: slot.decision_engine?.risk_level,
     };
   });
@@ -118,12 +118,12 @@ export function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSy
   const current = slots[0];
   const forecast = slots;
   const recommendedSlots = slots.filter((slot) => slot.schedule_eligible);
-  const action = actionConfig[current.decision_action] ?? actionConfig.DELAY_FLIGHT;
+  const action = actionConfig[current.decision_action] ?? actionConfig.DELAY;
   const notifications = [
     {
       id: `decision-${current.timestamp}`,
-      icon: current.decision_action === "TAKE_OFF" ? "check" : "shield_alert",
-      tone: current.decision_action === "TAKE_OFF" ? "success" : "warning",
+      icon: current.decision_action === "FLY" ? "check" : "shield_alert",
+      tone: current.decision_action === "FLY" ? "success" : "warning",
       title: action.title,
       detail: `${dashboard.location}: mức rủi ro ${translateRiskLevel(current.risk_level).toLowerCase()}.`,
       time: current.time,
@@ -141,7 +141,7 @@ export function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSy
     });
   }
 
-  if (current.precipitation > 0 || current.rain_probability > 30 || current.decision_action === "RETURN_TO_CHARGING") {
+  if (current.precipitation > 0 || current.rain_probability > 30 || current.decision_action === "NO_FLY") {
     notifications.push({
       id: `rain-${current.timestamp}`,
       icon: "rainy",
@@ -163,7 +163,7 @@ export function buildRealNotifications({ dashboard, pipelineRun, syncing, lastSy
     });
   }
 
-  const riskySlots = forecast.filter((slot) => slot.decision_action !== "TAKE_OFF");
+  const riskySlots = forecast.filter((slot) => slot.decision_action !== "FLY");
   if (riskySlots.length > 0) {
     const firstRiskySlot = riskySlots[0];
     notifications.push({
@@ -252,7 +252,7 @@ export function buildDashboardAnalytics(dashboard) {
       visibility: slot.weather?.visibility,
       weather_description: slot.weather?.weather_description,
       decision_action: slot.decision_engine?.final_decision,
-      schedule_eligible: slot.decision_engine?.final_decision === "TAKE_OFF",
+      schedule_eligible: slot.decision_engine?.final_decision === "FLY",
       risk_level: slot.decision_engine?.risk_level,
     };
   });
@@ -277,13 +277,13 @@ export function buildDashboardAnalytics(dashboard) {
 
 export function buildActionSegments(rows) {
   const colors = {
-    TAKE_OFF: "#65a875",
-    DELAY_FLIGHT: "#dca04c",
+    FLY: "#65a875",
+    DELAY: "#dca04c",
     LOCK_SPRAY: "#c56d51",
-    RETURN_TO_CHARGING: "#4f8ca9",
+    NO_FLY: "#4f8ca9",
   };
   const counts = rows.reduce((totals, row) => {
-    const act = row.decision_action || "DELAY_FLIGHT";
+    const act = row.decision_action || "DELAY";
     totals[act] = (totals[act] ?? 0) + 1;
     return totals;
   }, {});
@@ -351,10 +351,10 @@ export function formatDateTimeWithSeconds(value) {
 export function translatePrediction(pred) {
   if (!pred) return "--";
   const mapping = {
-    TAKE_OFF: "CẤT CÁNH",
-    DELAY_FLIGHT: "HOÃN BAY",
+    FLY: "CẤT CÁNH",
+    DELAY: "HOÃN BAY",
     LOCK_SPRAY: "KHÓA PHUN",
-    RETURN_TO_CHARGING: "VỀ TRẠM SẠC",
+    NO_FLY: "VỀ TRẠM SẠC",
   };
   return mapping[pred] ?? pred;
 }
@@ -525,10 +525,10 @@ export function translateWeatherDescription(description) {
 export function formatRecommendationText(text) {
   if (!text) return "--";
   return `${text}`
-    .replace(/^TAKE_OFF:/, "Có thể cất cánh:")
+    .replace(/^FLY:/, "Có thể cất cánh:")
     .replace(/^LOCK_SPRAY:/, "Khóa lệnh phun:")
-    .replace(/^RETURN_TO_CHARGING:/, "Đưa UAV về trạm sạc:")
-    .replace(/^DELAY_FLIGHT:/, "Nên hoãn chuyến bay:")
+    .replace(/^NO_FLY:/, "Đưa UAV về trạm sạc:")
+    .replace(/^DELAY:/, "Nên hoãn chuyến bay:")
     .replace("Dieu kien bay chap nhan duoc.", "Điều kiện bay chấp nhận được.")
     .replace(/Gio ([\d.]+) km\/h, gio giat ([\d.]+) km\/h, xac suat mua ([\d.]+)%\./, "Gió $1 km/h, gió giật $2 km/h, khả năng mưa $3%.")
     .replace(/De xuat flow-rate ([\d.]+)%\./, "Mức phun đề xuất $1%.")

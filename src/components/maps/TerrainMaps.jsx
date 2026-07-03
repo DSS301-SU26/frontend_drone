@@ -5,55 +5,32 @@ import { useApp } from "../../context/AppContext";
 
 const SATELLITE_URL = "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}";
 
-// Mapping location names to GPS coordinates and demo farm plots
-const LOCATION_MAP = {
-  "Dong Thap": {
-    center: [10.4544, 105.6323],
-    plots: [
-      [[10.456, 105.630], [10.456, 105.634], [10.452, 105.634], [10.452, 105.630]],
-      [[10.452, 105.630], [10.452, 105.634], [10.449, 105.634], [10.449, 105.630]],
-      [[10.456, 105.635], [10.456, 105.640], [10.450, 105.640], [10.450, 105.635]],
-    ],
-  },
-  "Can Tho": {
-    center: [10.0342, 105.7220],
-    plots: [
-      [[10.036, 105.720], [10.036, 105.724], [10.032, 105.724], [10.032, 105.720]],
-      [[10.032, 105.720], [10.032, 105.724], [10.029, 105.724], [10.029, 105.720]],
-      [[10.036, 105.725], [10.036, 105.730], [10.030, 105.730], [10.030, 105.725]],
-    ],
-  },
-  "Long An": {
-    center: [10.5360, 106.4130],
-    plots: [
-      [[10.538, 106.411], [10.538, 106.415], [10.534, 106.415], [10.534, 106.411]],
-      [[10.534, 106.411], [10.534, 106.415], [10.531, 106.415], [10.531, 106.411]],
-      [[10.538, 106.416], [10.538, 106.421], [10.532, 106.421], [10.532, 106.416]],
-    ],
-  },
-  "An Giang": {
-    center: [10.3860, 105.4350],
-    plots: [
-      [[10.388, 105.433], [10.388, 105.437], [10.384, 105.437], [10.384, 105.433]],
-      [[10.384, 105.433], [10.384, 105.437], [10.381, 105.437], [10.381, 105.433]],
-      [[10.388, 105.438], [10.388, 105.443], [10.382, 105.443], [10.382, 105.438]],
-    ],
-  },
-};
+// Function to generate a square polygon centered at lat, lng with a given area in hectares
+function generatePlotPolygon(lat, lng, areaHa) {
+  const areaSqMeters = areaHa * 10000;
+  const sideLengthMeters = Math.sqrt(areaSqMeters);
+  const offsetMeters = sideLengthMeters / 2;
 
-const DEFAULT_LOCATION = LOCATION_MAP["Dong Thap"];
+  // 1 degree latitude is approx 111,320 meters
+  const latOffset = offsetMeters / 111320;
+  // 1 degree longitude depends on latitude
+  const lngOffset = offsetMeters / (111320 * Math.cos(lat * Math.PI / 180));
 
-function getLocationData(locationId) {
-  // Try exact match first, then partial match
-  if (LOCATION_MAP[locationId]) return LOCATION_MAP[locationId];
-  const key = Object.keys(LOCATION_MAP).find(k => locationId?.toLowerCase().includes(k.toLowerCase()));
-  return key ? LOCATION_MAP[key] : DEFAULT_LOCATION;
+  return [
+    [lat + latOffset, lng - lngOffset],
+    [lat + latOffset, lng + lngOffset],
+    [lat - latOffset, lng + lngOffset],
+    [lat - latOffset, lng - lngOffset],
+  ];
 }
 
 export default function TerrainMaps() {
-  const { locationId } = useApp();
-  const locData = getLocationData(locationId);
-
+  const { locationId, locations } = useApp();
+  const activePlot = locations.find(l => l.id === locationId) || locations[0];
+  
+  // Default to Dong Thap if locations array is empty
+  const center = activePlot ? [activePlot.lat, activePlot.lng] : [10.4544, 105.6323];
+  
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const boundaryLayerRef = useRef(null);
@@ -64,10 +41,10 @@ export default function TerrainMaps() {
 
   // Initialize leaflet map once
   useEffect(() => {
-    if (mapInstanceRef.current) return;
+    if (mapInstanceRef.current || !activePlot) return;
 
     const map = L.map(mapRef.current, {
-      center: locData.center,
+      center: center,
       zoom: 16,
       zoomControl: false,
       attributionControl: false,
@@ -77,24 +54,9 @@ export default function TerrainMaps() {
 
     mapInstanceRef.current = map;
 
-    // Draw initial layers
-    const plots = locData.plots || [];
-    const boundaryGroup = L.layerGroup(
-      plots.map((coords, i) => L.polygon(coords, {
-        color: i < 2 ? "#4bddb7" : "#3c4a44",
-        fill: false,
-        dashArray: "8 4",
-        weight: 2,
-      }))
-    ).addTo(map);
-    boundaryLayerRef.current = boundaryGroup;
-
-    const ndviGroup = L.layerGroup(
-      plots.length > 2
-        ? [L.polygon(plots[2], { color: "transparent", fillColor: "#f0bf63", fillOpacity: 0.5 })]
-        : []
-    ).addTo(map);
-    ndviLayerRef.current = ndviGroup;
+    // Create groups
+    boundaryLayerRef.current = L.layerGroup().addTo(map);
+    ndviLayerRef.current = L.layerGroup().addTo(map);
 
     setTimeout(() => map.invalidateSize(), 200);
 
@@ -104,35 +66,37 @@ export default function TerrainMaps() {
     };
   }, []);
 
-  // Fly to new location and redraw polygons when locationId changes
+  // Fly to new location and redraw polygons when activePlot changes
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map || !activePlot) return;
 
-    map.flyTo(locData.center, 16, { duration: 1.5 });
+    const newCenter = [activePlot.lat, activePlot.lng];
+    map.flyTo(newCenter, 16, { duration: 1.5 });
+
+    const plotPolygon = generatePlotPolygon(activePlot.lat, activePlot.lng, activePlot.area);
 
     // Redraw boundary polygons
     if (boundaryLayerRef.current) {
       boundaryLayerRef.current.clearLayers();
-      (locData.plots || []).forEach((coords, i) => {
-        L.polygon(coords, {
-          color: i < 2 ? "#4bddb7" : "#3c4a44",
-          fill: false,
-          dashArray: "8 4",
-          weight: 2,
-        }).addTo(boundaryLayerRef.current);
-      });
+      L.polygon(plotPolygon, {
+        color: "#4bddb7",
+        fill: false,
+        dashArray: "8 4",
+        weight: 2,
+      }).addTo(boundaryLayerRef.current);
     }
 
     // Redraw NDVI overlay
     if (ndviLayerRef.current) {
       ndviLayerRef.current.clearLayers();
-      if (locData.plots?.length > 2) {
-        L.polygon(locData.plots[2], { color: "transparent", fillColor: "#f0bf63", fillOpacity: 0.5 })
-          .addTo(ndviLayerRef.current);
-      }
+      L.polygon(plotPolygon, { 
+        color: "transparent", 
+        fillColor: "#f0bf63", 
+        fillOpacity: 0.5 
+      }).addTo(ndviLayerRef.current);
     }
-  }, [locationId]);
+  }, [activePlot]);
 
   // Toggle boundary layer
   useEffect(() => {
@@ -160,7 +124,9 @@ export default function TerrainMaps() {
 
   const handleZoomIn = () => mapInstanceRef.current?.zoomIn();
   const handleZoomOut = () => mapInstanceRef.current?.zoomOut();
-  const handleRecenter = () => mapInstanceRef.current?.flyTo(locData.center, 16);
+  const handleRecenter = () => mapInstanceRef.current?.flyTo(center, 16);
+
+  if (!activePlot) return null;
 
   return (
     <div className="flex-1 relative w-full h-[calc(100vh-64px)] md:h-full bg-surface-dim overflow-hidden rounded-xl border border-outline-variant">
@@ -246,9 +212,9 @@ export default function TerrainMaps() {
           
           {/* Active Measurement Readout */}
           <div className="mt-4 p-3 bg-surface-container-lowest rounded-lg border border-outline-variant flex flex-col gap-1">
-            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-wider">Khu vực Alpha được chọn</span>
+            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase tracking-wider">{activePlot.name}</span>
             <div className="flex items-baseline gap-2">
-              <span className="font-data-mono text-xl font-bold text-primary">142.5</span>
+              <span className="font-data-mono text-xl font-bold text-primary">{activePlot.area}</span>
               <span className="font-label-caps text-label-caps text-on-surface-variant">Hecta</span>
             </div>
           </div>

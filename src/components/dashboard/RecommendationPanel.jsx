@@ -8,7 +8,9 @@ export default function RecommendationPanel() {
   const scorePercent = Math.round(flyScore * 100);
   const isSafe = current?.decision_engine?.is_safe_to_fly;
   const isHighRisk = flyScore < 0.50;
-  const flowRate = current?.decision_engine?.resource_regressor?.flow_rate_l_ha ?? 0;
+  
+  const cropImpactScore = current?.decision_engine?.crop_impact_score ?? 100;
+  const sprayQualityScore = current?.decision_engine?.spray_quality_score ?? 100;
 
   // Determine risk color
   const riskColor = isHighRisk ? "#ff4a4a" : flyScore >= 0.80 ? "#4bddb7" : "#f0bf63";
@@ -44,22 +46,29 @@ export default function RecommendationPanel() {
           <p className="font-body-md text-body-md text-on-surface-variant">{action.description}</p>
         </div>
 
-        <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-sm flex justify-between items-center">
-          <div className="flex flex-col">
-            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐỊNH MỨC PHUN</span>
-            <span className="font-display-lg text-primary text-[24px] font-bold leading-none">
-              {formatNumber(flowRate)} <span className="text-sm font-normal text-on-surface-variant">L/ha</span>
-            </span>
-          </div>
-        </div>
-
         <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : flyScore >= 0.80 ? '#1c4a2d' : '#4a3f1c' }}>
           <div className="flex justify-between items-end mb-xs">
-            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">KHẢ NĂNG CẤT CÁNH (AI FLYABILITY SCORE)</span>
+            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">KHẢ NĂNG CẤT CÁNH (AI SCORE)</span>
             <span className="font-bold" style={{ color: riskColor }}>{scorePercent}%</span>
           </div>
-          <div className="w-full bg-surface-container-lowest h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-surface-container-lowest h-2 rounded-full overflow-hidden mb-sm">
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${scorePercent}%`, backgroundColor: riskColor }}></div>
+          </div>
+
+          <div className="flex justify-between items-end mb-xs">
+            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN CÂY TRỒNG</span>
+            <span className="font-bold text-primary">{Math.round(cropImpactScore)}</span>
+          </div>
+          <div className="w-full bg-surface-container-lowest h-1.5 rounded-full overflow-hidden mb-sm">
+            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${cropImpactScore}%` }}></div>
+          </div>
+
+          <div className="flex justify-between items-end mb-xs">
+            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM CHẤT LƯỢNG PHUN</span>
+            <span className="font-bold text-primary">{Math.round(sprayQualityScore)}</span>
+          </div>
+          <div className="w-full bg-surface-container-lowest h-1.5 rounded-full overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${sprayQualityScore}%` }}></div>
           </div>
         </div>
 
@@ -69,7 +78,7 @@ export default function RecommendationPanel() {
             className="w-full bg-primary-container text-on-primary-container py-sm rounded-lg font-label-caps text-label-caps font-bold flex justify-center items-center gap-sm hover:bg-primary transition-colors"
           >
             <span className="material-symbols-outlined text-[16px]">flight_takeoff</span>
-            KÍCH HOẠT CẤT CÁNH (TAKE OFF)
+            KÍCH HOẠT CẤT CÁNH (FLY)
           </button>
         ) : (
           <button
@@ -128,10 +137,10 @@ export default function RecommendationPanel() {
                 className="bg-surface-container-highest border border-outline-variant text-on-surface rounded p-sm w-full outline-none focus:border-primary"
               >
                 <option value="">-- Chọn quyết định --</option>
-                <option value="TAKE_OFF">Cất cánh (Bỏ qua cảnh báo)</option>
-                <option value="DELAY_FLIGHT">Hoãn bay</option>
-                <option value="LOCK_SPRAY">Khóa phun</option>
-                <option value="RETURN_TO_CHARGING">Quay về trạm</option>
+                <option value="FLY">Cất cánh (FLY)</option>
+                <option value="DELAY">Hoãn bay (DELAY)</option>
+                <option value="LOCK_SPRAY">Khóa phun (LOCK_SPRAY)</option>
+                <option value="NO_FLY">Cấm bay (NO_FLY)</option>
               </select>
             </div>
 

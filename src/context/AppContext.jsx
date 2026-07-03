@@ -34,13 +34,27 @@ import {
   ruleFields,
 } from "../utils/helpers";
 
+
+const PLOTS_DATA = [
+  { id: "plot_1", name: "Vườn Lúa Tiền Giang", province: "Tien Giang", area: 2.5, cropStage: "SEEDLING", lat: 10.25, lng: 106.33 },
+  { id: "plot_3", name: "Vườn Lúa Đồng Tháp", province: "Dong Thap", area: 5.0, cropStage: "TILLERING", lat: 10.45, lng: 105.63 },
+  { id: "plot_5", name: "Vườn Lúa An Giang", province: "An Giang", area: 10.0, cropStage: "BOOTING", lat: 10.38, lng: 105.42 },
+  { id: "plot_7", name: "Vườn Lúa Cần Thơ", province: "Can Tho", area: 1.5, cropStage: "GRAIN_FILLING", lat: 10.03, lng: 105.78 },
+  { id: "plot_9", name: "Vườn Lúa Long An", province: "Long An", area: 6.0, cropStage: "TILLERING", lat: 10.53, lng: 106.38 },
+  { id: "plot_11", name: "Vườn Mẫu Đồng Tháp", province: "Dong Thap", area: 15.0, cropStage: "SEEDLING", lat: 10.42, lng: 105.68 },
+  { id: "plot_12", name: "Ruộng Thử Nghiệm An Giang", province: "An Giang", area: 2.8, cropStage: "GRAIN_FILLING", lat: 10.39, lng: 105.45 },
+  { id: "plot_13", name: "Nông Trại Cần Thơ", province: "Can Tho", area: 5.5, cropStage: "BOOTING", lat: 10.05, lng: 105.75 },
+  { id: "plot_14", name: "Vườn Rau Củ Chi - Hồ Chí Minh", province: "Ho Chi Minh", area: 4.5, cropStage: "TILLERING", lat: 10.95, lng: 106.50 },
+  { id: "plot_15", name: "Nông Trại Gia Lâm - Hà Nội", province: "Ha Noi", area: 3.5, cropStage: "GRAIN_FILLING", lat: 21.02, lng: 105.90 }
+];
+
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   // === Core Data State ===
   const [locations, setLocations] = useState([]);
   const [droneList, setDroneList] = useState([]);
-  const [locationId, setLocationId] = useState("Dong Thap");
+  const [locationId, setLocationId] = useState("plot_3");
   const [dashboard, setDashboard] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(0);
   const [activeNav, setActiveNav] = useState("mission-control");
@@ -103,7 +117,8 @@ export function AppProvider({ children }) {
     setSyncing(true);
     setError("");
     try {
-      const payload = await getDashboardSlots(locationId, null, farmSize, distanceKm, droneModel, pesticide, cropStage);
+      const activePlot = PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
+      const payload = await getDashboardSlots(activePlot.province, null, activePlot.area, distanceKm, droneModel, pesticide, activePlot.cropStage);
       setDashboard(payload);
       if (!keepSelected) {
         setSelectedSlot(0);
@@ -120,7 +135,7 @@ export function AppProvider({ children }) {
     } finally {
       setSyncing(false);
     }
-  }, [locationId, farmSize, distanceKm, droneModel, pesticide, cropStage, notify]);
+  }, [locationId, distanceKm, droneModel, pesticide, notify]);
 
   const executePipelineRefresh = useCallback(async (showToast = true) => {
     setSyncing(true);
@@ -174,7 +189,13 @@ export function AppProvider({ children }) {
 
   // === Effects ===
   useEffect(() => {
-    getLocations().then(setLocations).catch((e) => setError(e.message));
+    const activePlot = PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
+    setFarmSize(activePlot.area);
+    setCropStage(activePlot.cropStage);
+  }, [locationId]);
+
+  useEffect(() => {
+    setLocations(PLOTS_DATA);
     getDronesList().then(setDroneList).catch((e) => setError(e.message));
     getDecisionConfig()
       .then((config) => { setDecisionConfig(config); setRuleForm(config.thresholds ?? {}); })
@@ -215,7 +236,7 @@ export function AppProvider({ children }) {
       const hour = time ? Number(time.split(":")[0]) : 0;
       const end_time = time ? `${(hour + 1).toString().padStart(2, "0")}:00` : "";
       const decision_action = getDecisionAction(slot);
-      const schedule_eligible = slot.decision_engine?.is_safe_to_fly ?? (decision_action === "TAKE_OFF");
+      const schedule_eligible = slot.decision_engine?.is_safe_to_fly ?? (decision_action === "FLY");
       return {
         ...slot,
         time,
@@ -240,7 +261,7 @@ export function AppProvider({ children }) {
   }, [dashboard]);
 
   const current = slots[selectedSlot] ?? slots[0] ?? {};
-  const action = actionConfig[current?.decision_action] ?? actionConfig.DELAY_FLIGHT;
+  const action = actionConfig[current?.decision_action] ?? actionConfig.DELAY;
   const canSchedule = Boolean(current?.schedule_eligible);
   const activeDecisionConfig = decisionConfig ?? dashboard?.decision_config;
   const ruleSourceLabel = activeDecisionConfig?.source === "file" ? "giao diện" : "mặc định";
@@ -258,7 +279,7 @@ export function AppProvider({ children }) {
   const operationTile = timelineTiles.find((tile) => tile.timestamp === operationTimestamp) ?? current;
   const nextSafeSlot = timelineTiles.find((tile) => tile.schedule_eligible) ?? slots.find((tile) => tile.schedule_eligible);
   const isAirborne = droneState !== "DOCKED";
-  const weatherUnsafe = operationTile?.decision_action !== "TAKE_OFF";
+  const weatherUnsafe = operationTile?.decision_action !== "FLY";
   const isSpraying = droneState === "SPRAYING" && !sprayLocked;
   const countdown = formatCountdown(dashboard?.date || "", nextSafeSlot?.timestamp);
   const sceneWeather = getSceneWeather(operationTile);
@@ -356,7 +377,7 @@ export function AppProvider({ children }) {
     if (!current?.id) { notify("Lỗi: Không tìm thấy ID cho bản ghi này."); return; }
     setSubmittingOverride(true);
     try {
-      const aiDecision = current.decision_engine?.champion_score > 0.80 ? "TAKE_OFF" : "DELAY_FLIGHT";
+      const aiDecision = current.decision_engine?.champion_score > 0.80 ? "FLY" : "DELAY";
       await overrideDecision(current.id, {
         override_decision: aiDecision,
         user_notes: "",
