@@ -1,7 +1,20 @@
+import { useState } from "react";
 import { useApp } from "../../context/AppContext";
 import { formatNumber } from "../../utils/helpers";
 
+const FACTOR_LABELS = {
+  temperature: "Nhiệt độ", humidity: "Độ ẩm", wind_speed: "Tốc độ gió",
+  wind_gust: "Gió giật", wind_direction: "Hướng gió", rain: "Mưa",
+  visibility: "Tầm nhìn", cloud_cover: "Mây che phủ", stage_time_ban: "Khung giờ giai đoạn",
+  drone_wind_limit: "Giới hạn gió drone", drone_gust_limit: "Giới hạn giật drone",
+  pesticide_uv_timing: "Thời điểm phun (UV)", pesticide_rain_washout: "Rửa trôi thuốc",
+  formulation: "Dạng thuốc", water_ph: "pH nước", adjuvant: "Chất trợ lực",
+  nozzle: "Loại béc", canopy_density: "Mật độ tán lá",
+};
+const VERDICT_COLOR = { ALLOW: "#4bddb7", WARN: "#f0bf63", STOP: "#ff6b6b" };
+
 export default function RecommendationPanel() {
+  const [showFactors, setShowFactors] = useState(false);
   const { current, action, activeRisk, isOverriding, setIsOverriding, overrideDecisionValue, setOverrideDecisionValue, overrideNotes, setOverrideNotes, submittingOverride, handleOverrideDecision, handleRevertToAi, launchDrone } = useApp();
 
   const flyScore = current?.decision_engine?.flyability_score ?? 0;
@@ -9,6 +22,8 @@ export default function RecommendationPanel() {
   const isSafe = current?.decision_engine?.is_safe_to_fly;
   const isHighRisk = flyScore < 0.50;
   const flowRate = current?.decision_engine?.resource_regressor?.flow_rate_l_ha ?? 0;
+  const cropScore = Math.round(current?.decision_engine?.crop_impact_score ?? 0);
+  const sprayScore = Math.round(current?.decision_engine?.spray_quality_score ?? 0);
 
   // Determine risk color
   const riskColor = isHighRisk ? "#ff4a4a" : flyScore >= 0.80 ? "#4bddb7" : "#f0bf63";
@@ -63,6 +78,23 @@ export default function RecommendationPanel() {
           </div>
         </div>
 
+        {/* 3 điểm rủi ro DSS (BRD §2.2) */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "An toàn bay", value: scorePercent, color: riskColor },
+            { label: "Tác động lúa", value: cropScore, color: "#6fb3ff" },
+            { label: "Chất lượng phun", value: sprayScore, color: "#c9a0ff" },
+          ].map((s) => (
+            <div key={s.label} className="bg-surface-container-lowest border border-outline-variant rounded-lg p-sm flex flex-col items-center gap-1">
+              <span className="font-label-caps text-[9px] text-on-surface-variant uppercase text-center leading-tight">{s.label}</span>
+              <span className="font-display-lg text-[18px] font-bold leading-none" style={{ color: s.color }}>{s.value}</span>
+              <div className="w-full bg-surface-container h-1 rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${s.value}%`, backgroundColor: s.color }}></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {isSafe ? (
           <button
             onClick={launchDrone}
@@ -109,6 +141,29 @@ export default function RecommendationPanel() {
           <div className="flex items-start gap-sm mt-xs text-[11px]" style={{ color: riskColor }}>
             <span className="material-symbols-outlined text-[14px]">error</span>
             <span>{current.decision_engine.xai_alert}</span>
+          </div>
+        )}
+
+        {/* Ma trận tác nhân §3.3 */}
+        {current?.decision_engine?.factors?.length > 0 && (
+          <div className="border-t pt-sm mt-xs" style={{ borderColor: "#2a2f2c" }}>
+            <button
+              onClick={() => setShowFactors((v) => !v)}
+              className="w-full flex justify-between items-center font-label-caps text-[10px] text-on-surface-variant uppercase hover:text-on-surface"
+            >
+              <span>Ma trận {current.decision_engine.factors.length} tác nhân an toàn</span>
+              <span className="material-symbols-outlined text-[16px]">{showFactors ? "expand_less" : "expand_more"}</span>
+            </button>
+            {showFactors && (
+              <div className="grid grid-cols-2 gap-1 mt-sm max-h-52 overflow-y-auto custom-scrollbar">
+                {current.decision_engine.factors.map((f, i) => (
+                  <div key={i} className="flex items-center gap-xs bg-surface-container-lowest border border-outline-variant rounded px-2 py-1" title={f.message}>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: VERDICT_COLOR[f.verdict] || "#9aa6a2" }}></span>
+                    <span className="text-[10px] text-on-surface-variant truncate">{FACTOR_LABELS[f.factor] || f.factor}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

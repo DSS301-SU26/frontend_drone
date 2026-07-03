@@ -334,9 +334,9 @@ export function AppProvider({ children }) {
       await overrideDecision({
         reason: `${overrideDecisionValue}: ${overrideNotes}`,
         weather: rawWeather,
-        drone_model: current.drone_model || "DJI_T30",
-        pesticide: current.pesticide || null,
-        crop_stage: current.crop_stage || null,
+        drone_model: droneModel || "DJI_T30",
+        pesticide: pesticide || null,
+        crop_stage: cropStage || null,
         hour: current.hour || null,
         plot_id: current.plot_id || null,
         mission_id: current.mission_id || null
@@ -353,19 +353,14 @@ export function AppProvider({ children }) {
   };
 
   const handleRevertToAi = async () => {
-    if (!current?.id) { notify("Lỗi: Không tìm thấy ID cho bản ghi này."); return; }
+    // Slots duoc tinh lai moi moi lan load -> khoi phuc AI = reset UI + reload
     setSubmittingOverride(true);
     try {
-      const aiDecision = current.decision_engine?.champion_score > 0.80 ? "TAKE_OFF" : "DELAY_FLIGHT";
-      await overrideDecision(current.id, {
-        override_decision: aiDecision,
-        user_notes: "",
-        was_human_overridden: false
-      });
-      notify("Đã khôi phục quyết định đề xuất từ AI.");
       setIsOverriding(false);
       setOverrideNotes("");
+      setOverrideDecisionValue("");
       await loadDashboard(false, true);
+      notify("Đã khôi phục quyết định đề xuất từ AI.");
     } catch (err) {
       notify(`Khôi phục thất bại: ${err.message}`);
     } finally {
