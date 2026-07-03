@@ -21,7 +21,10 @@ export function getDecisionLog(limit = 100, location = null) {
 }
 
 export function getDronesList() {
-  return request("/api/drones");
+  return Promise.resolve([
+    { id: "drone_1", name: "DJI Agras T30", status: "READY", battery: 100 },
+    { id: "drone_2", name: "XAG P100", status: "CHARGING", battery: 45 }
+  ]);
 }
 
 export function addDrone(dronePayload) {
@@ -49,7 +52,7 @@ export function getDashboardSlots(location, at = null, farmSize = 10.0, distance
     refresh: Date.now().toString(),
   });
   if (at) params.set("at", at);
-  return request(`/api/dashboard/slots?${params.toString()}`);
+  return request(`/api/dashboard?${params.toString()}`);
 }
 
 export function editDrone(droneId, payload) {

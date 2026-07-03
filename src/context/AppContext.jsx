@@ -158,9 +158,10 @@ export function AppProvider({ children }) {
   const loadAiTraining = useCallback(async (showToast = false) => {
     setAiTrainingRefreshing(true);
     try {
-      const status = await getAiTrainingStatus(locationId);
+      const activePlot = PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
+      const status = await getAiTrainingStatus(activePlot.province);
       setAiTraining(status);
-      if (showToast) notify(`Đã làm mới phần huấn luyện AI cho ${locationId}.`);
+      if (showToast) notify(`Đã làm mới phần huấn luyện AI cho ${activePlot.name}.`);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
