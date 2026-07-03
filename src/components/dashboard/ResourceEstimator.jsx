@@ -50,6 +50,33 @@ export default function ResourceEstimator() {
             <span className="font-body-md text-sm text-on-surface-variant">Lít</span>
           </div>
         </div>
+
+        {current?.decision_engine?.opt_flight_config && (
+          <>
+            <div className="w-full h-px bg-outline-variant"></div>
+            
+            <div className="flex justify-between items-center">
+              <span className="font-body-md text-sm text-on-surface-variant">Độ cao bay khuyến nghị</span>
+              <span className="font-data-mono text-sm text-on-surface font-bold">
+                {current.decision_engine.opt_flight_config.alt_min} - {current.decision_engine.opt_flight_config.alt_max} m
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="font-body-md text-sm text-on-surface-variant">Vận tốc bay khuyến nghị</span>
+              <span className="font-data-mono text-sm text-on-surface font-bold">
+                {current.decision_engine.opt_flight_config.speed_min} - {current.decision_engine.opt_flight_config.speed_max} m/s
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="font-body-md text-sm text-on-surface-variant">Công nghệ vòi phun đề xuất</span>
+              <span className="font-data-mono text-sm text-on-surface font-bold">
+                {current.decision_engine.opt_flight_config.nozzle_tech === "CENTRIFUGAL" ? "Ly tâm (Centrifugal)" : "Áp lực (Pressure)"}
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

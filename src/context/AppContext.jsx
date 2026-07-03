@@ -332,6 +332,7 @@ export function AppProvider({ children }) {
       };
 
       await overrideDecision({
+        id: current.id,
         reason: `${overrideDecisionValue}: ${overrideNotes}`,
         weather: rawWeather,
         drone_model: droneModel || "DJI_T30",
@@ -339,7 +340,8 @@ export function AppProvider({ children }) {
         crop_stage: cropStage || null,
         hour: current.hour || null,
         plot_id: current.plot_id || null,
-        mission_id: current.mission_id || null
+        mission_id: current.mission_id || null,
+        location: locationId
       });
       notify("Đã cập nhật ghi đè quyết định thành công.");
       setIsOverriding(false);
