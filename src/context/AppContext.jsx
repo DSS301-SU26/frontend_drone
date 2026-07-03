@@ -353,14 +353,16 @@ export function AppProvider({ children }) {
       };
 
       await overrideDecision({
+        id: current.id,
         reason: `${overrideDecisionValue}: ${overrideNotes}`,
         weather: rawWeather,
-        drone_model: current.drone_model || "DJI_T30",
-        pesticide: current.pesticide || null,
-        crop_stage: current.crop_stage || null,
+        drone_model: droneModel || "DJI_T30",
+        pesticide: pesticide || null,
+        crop_stage: cropStage || null,
         hour: current.hour || null,
         plot_id: current.plot_id || null,
-        mission_id: current.mission_id || null
+        mission_id: current.mission_id || null,
+        location: locationId
       });
       notify("Đã cập nhật ghi đè quyết định thành công.");
       setIsOverriding(false);
@@ -374,9 +376,10 @@ export function AppProvider({ children }) {
   };
 
   const handleRevertToAi = async () => {
-    if (!current?.id) { notify("Lỗi: Không tìm thấy ID cho bản ghi này."); return; }
+    // Slots duoc tinh lai moi moi lan load -> khoi phuc AI = reset UI + reload
     setSubmittingOverride(true);
     try {
+<<<<<<< HEAD
       const aiDecision = current.decision_engine?.champion_score > 0.80 ? "FLY" : "DELAY";
       await overrideDecision(current.id, {
         override_decision: aiDecision,
@@ -384,9 +387,13 @@ export function AppProvider({ children }) {
         was_human_overridden: false
       });
       notify("Đã khôi phục quyết định đề xuất từ AI.");
+=======
+>>>>>>> origin/main
       setIsOverriding(false);
       setOverrideNotes("");
+      setOverrideDecisionValue("");
       await loadDashboard(false, true);
+      notify("Đã khôi phục quyết định đề xuất từ AI.");
     } catch (err) {
       notify(`Khôi phục thất bại: ${err.message}`);
     } finally {

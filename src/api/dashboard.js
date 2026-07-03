@@ -14,6 +14,12 @@ export function getLocations() {
   return request("/api/locations");
 }
 
+export function getDecisionLog(limit = 100, location = null) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (location) params.set("location", location);
+  return request(`/api/decision-log?${params.toString()}`);
+}
+
 export function getDronesList() {
   return request("/api/drones");
 }
