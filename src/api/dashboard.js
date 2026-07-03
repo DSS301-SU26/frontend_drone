@@ -52,7 +52,7 @@ export function getDashboardSlots(location, at = null, farmSize = 10.0, distance
     refresh: Date.now().toString(),
   });
   if (at) params.set("at", at);
-  return request(`/api/dashboard?${params.toString()}`);
+  return request(`/api/dashboard/slots?${params.toString()}`);
 }
 
 export function editDrone(droneId, payload) {
