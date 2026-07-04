@@ -110,12 +110,13 @@ export default function WeatherTimeline() {
                 const scorePercent = Math.round(flyScore * 100);
                 const isHighRisk = flyScore < 0.50;
                 const riskColor = isHighRisk ? "#ff4a4a" : flyScore >= 0.80 ? "#4bddb7" : "#f0bf63";
-                const actionLabel = slot.decision_engine?.final_decision === "FLY" ? "Cất cánh" :
-                                   slot.decision_engine?.final_decision === "NO_FLY" ? "Về trạm sạc" :
-                                   slot.decision_engine?.final_decision === "LOCK_SPRAY" ? "Khóa phun" : "Hoãn bay";
-                const actionBg = slot.decision_engine?.final_decision === "FLY" ? "border-[#1c4a2d] text-[#4bddb7]" : 
-                               slot.decision_engine?.final_decision === "NO_FLY" ? "border-[#4a1c1c] text-[#ff4a4a]" :
-                               slot.decision_engine?.final_decision === "LOCK_SPRAY" ? "border-[#4a1c1c] text-[#ff4a4a]" : "border-[#4a3f1c] text-[#f0bf63]";
+                const dec = slot.decision_engine?.final_decision;
+                const actionLabel = (dec === "FLY" || dec === "TAKE_OFF") ? "Cất cánh" :
+                                   (dec === "NO_FLY" || dec === "RETURN_TO_CHARGING") ? "Về trạm sạc" :
+                                   dec === "LOCK_SPRAY" ? "Khóa phun" : "Hoãn bay";
+                const actionBg = (dec === "FLY" || dec === "TAKE_OFF") ? "border-[#1c4a2d] text-[#4bddb7]" : 
+                               (dec === "NO_FLY" || dec === "RETURN_TO_CHARGING") ? "border-[#4a1c1c] text-[#ff4a4a]" :
+                               dec === "LOCK_SPRAY" ? "border-[#4a1c1c] text-[#ff4a4a]" : "border-[#4a3f1c] text-[#f0bf63]";
                 const isConsensus = !slot.decision_engine?.was_conflict;
                 const wasOverridden = slot.was_human_overridden;
 

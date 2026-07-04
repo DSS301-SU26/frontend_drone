@@ -56,6 +56,12 @@ export function translateRiskLevel(risk) {
 }
 
 export function getDecisionAction(slot) {
+  const dec = slot.decision_engine?.final_decision;
+  if (dec === "FLY" || dec === "TAKE_OFF") return "FLY";
+  if (dec === "NO_FLY" || dec === "RETURN_TO_CHARGING") return "NO_FLY";
+  if (dec === "LOCK_SPRAY") return "LOCK_SPRAY";
+  if (dec === "DELAY" || dec === "DELAY_FLIGHT") return "DELAY";
+
   const score = slot.decision_engine?.flyability_score ?? 0;
   const isSafe = slot.decision_engine?.is_safe_to_fly;
   if (isSafe || score > 0.80) return "FLY";
