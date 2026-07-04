@@ -69,7 +69,7 @@ export default function RecommendationPanel() {
 
         <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : flyScore >= 0.80 ? '#1c4a2d' : '#4a3f1c' }}>
           <div className="flex justify-between items-end mb-xs">
-            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">KHẢ NĂNG CẤT CÁNH (AI SCORE)</span>
+            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN BAY</span>
             <span className="font-bold" style={{ color: riskColor }}>{scorePercent}%</span>
           </div>
           <div className="w-full bg-surface-container-lowest h-2 rounded-full overflow-hidden mb-sm">
