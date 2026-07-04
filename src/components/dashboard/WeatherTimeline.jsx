@@ -110,13 +110,22 @@ export default function WeatherTimeline() {
                 const scorePercent = Math.round(flyScore * 100);
                 const isHighRisk = flyScore < 0.50;
                 const riskColor = isHighRisk ? "#ff4a4a" : flyScore >= 0.80 ? "#4bddb7" : "#f0bf63";
-                const dec = slot.decision_engine?.final_decision;
-                const actionLabel = (dec === "FLY" || dec === "TAKE_OFF") ? "Cất cánh" :
-                                   (dec === "NO_FLY" || dec === "RETURN_TO_CHARGING") ? "Về trạm sạc" :
-                                   dec === "LOCK_SPRAY" ? "Khóa phun" : "Hoãn bay";
-                const actionBg = (dec === "FLY" || dec === "TAKE_OFF") ? "border-[#1c4a2d] text-[#4bddb7]" : 
-                               (dec === "NO_FLY" || dec === "RETURN_TO_CHARGING") ? "border-[#4a1c1c] text-[#ff4a4a]" :
-                               dec === "LOCK_SPRAY" ? "border-[#4a1c1c] text-[#ff4a4a]" : "border-[#4a3f1c] text-[#f0bf63]";
+                const originalDec = slot.decision_engine?.original_ai_decision || slot.decision_engine?.system_decision;
+                const actionLabel = (originalDec === "FLY" || originalDec === "TAKE_OFF") ? "Cất cánh" :
+                                   (originalDec === "NO_FLY" || originalDec === "RETURN_TO_CHARGING") ? "Về trạm sạc" :
+                                   originalDec === "LOCK_SPRAY" ? "Khóa phun" : "Hoãn bay";
+                const actionBg = (originalDec === "FLY" || originalDec === "TAKE_OFF") ? "border-[#1c4a2d] text-[#4bddb7]" : 
+                               (originalDec === "NO_FLY" || originalDec === "RETURN_TO_CHARGING") ? "border-[#4a1c1c] text-[#ff4a4a]" :
+                               originalDec === "LOCK_SPRAY" ? "border-[#4a1c1c] text-[#ff4a4a]" : "border-[#4a3f1c] text-[#f0bf63]";
+                
+                const overrideDec = slot.decision_engine?.system_decision;
+                const overrideLabel = (overrideDec === "FLY" || overrideDec === "TAKE_OFF") ? "Cất cánh" :
+                                   (overrideDec === "NO_FLY" || overrideDec === "RETURN_TO_CHARGING") ? "Về trạm sạc" :
+                                   overrideDec === "LOCK_SPRAY" ? "Khóa phun" : "Hoãn bay";
+                const overrideColor = (overrideDec === "FLY" || overrideDec === "TAKE_OFF") ? "text-[#4bddb7]" : 
+                               (overrideDec === "NO_FLY" || overrideDec === "RETURN_TO_CHARGING") ? "text-[#ff4a4a]" :
+                               overrideDec === "LOCK_SPRAY" ? "text-[#ff4a4a]" : "text-[#f0bf63]";
+
                 const isConsensus = !slot.decision_engine?.was_conflict;
                 const wasOverridden = slot.was_human_overridden;
 
@@ -147,7 +156,7 @@ export default function WeatherTimeline() {
                     <td className="p-sm text-center font-data-mono font-bold text-sm text-on-surface">0</td>
                     <td className="p-sm text-center">
                       {wasOverridden ? (
-                        <span className="material-symbols-outlined text-secondary text-[16px]">how_to_reg</span>
+                        <span className={`font-data-mono text-[11px] font-bold ${overrideColor}`}>{overrideLabel}</span>
                       ) : (
                         <span className="text-on-surface-variant">-</span>
                       )}
