@@ -56,7 +56,7 @@ export function translateRiskLevel(risk) {
 }
 
 export function getDecisionAction(slot) {
-  const dec = slot.decision_engine?.final_decision;
+  const dec = slot.decision_engine?.system_decision;
   if (dec === "FLY" || dec === "TAKE_OFF") return "FLY";
   if (dec === "NO_FLY" || dec === "RETURN_TO_CHARGING") return "NO_FLY";
   if (dec === "LOCK_SPRAY") return "LOCK_SPRAY";
