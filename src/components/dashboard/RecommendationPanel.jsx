@@ -59,6 +59,12 @@ export default function RecommendationPanel() {
         <div>
           <h4 className="font-headline-md text-headline-sm font-bold text-white mb-xs">{action.title}</h4>
           <p className="font-body-md text-body-md text-on-surface-variant">{action.description}</p>
+          {current?.was_human_overridden && current?.user_notes && (
+            <div className="mt-sm p-sm bg-surface-container-high rounded-lg border-l-2 border-primary">
+              <span className="font-label-caps text-primary text-[10px] uppercase block mb-1">Ghi chú của quản trị viên:</span>
+              <p className="text-on-surface text-sm italic">{current.user_notes}</p>
+            </div>
+          )}
         </div>
 
         <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : flyScore >= 0.80 ? '#1c4a2d' : '#4a3f1c' }}>
