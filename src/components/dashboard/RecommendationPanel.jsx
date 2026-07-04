@@ -198,10 +198,14 @@ export default function RecommendationPanel() {
                 className="bg-surface-container-highest border border-outline-variant text-on-surface rounded p-sm w-full outline-none focus:border-primary"
               >
                 <option value="">-- Chọn quyết định --</option>
-                <option value="FLY">Cất cánh (FLY)</option>
-                <option value="DELAY">Hoãn bay (DELAY)</option>
-                <option value="LOCK_SPRAY">Khóa phun (LOCK_SPRAY)</option>
-                <option value="NO_FLY">Cấm bay (NO_FLY)</option>
+                {[
+                  { value: "FLY", label: "Cất cánh (FLY)" },
+                  { value: "DELAY", label: "Hoãn bay (DELAY)" },
+                  { value: "LOCK_SPRAY", label: "Khóa phun (LOCK_SPRAY)" },
+                  { value: "NO_FLY", label: "Cấm bay (NO_FLY)" }
+                ].filter(opt => opt.value !== current?.decision_engine?.system_decision).map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
 
