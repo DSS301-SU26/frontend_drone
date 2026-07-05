@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../../context/AppContext";
-import { formatNumber } from "../../utils/helpers";
+import { formatNumber, formatRecommendationText } from "../../utils/helpers";
 
 const FACTOR_LABELS = {
   temperature: "Nhiệt độ", humidity: "Độ ẩm", wind_speed: "Tốc độ gió",
@@ -58,7 +58,9 @@ export default function RecommendationPanel() {
 
         <div>
           <h4 className="font-headline-md text-headline-sm font-bold text-white mb-xs">{action.title}</h4>
-          <p className="font-body-md text-body-md text-on-surface-variant">{action.description}</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            {formatRecommendationText(current?.xai_alert || current?.decision_engine?.xai_alert || current?.xai_explanation) || action.description}
+          </p>
           {current?.was_human_overridden && current?.user_notes && (
             <div className="mt-sm p-sm bg-surface-container-high rounded-lg border-l-2 border-primary">
               <span className="font-label-caps text-primary text-[10px] uppercase block mb-1">Ghi chú của quản trị viên:</span>
@@ -152,12 +154,7 @@ export default function RecommendationPanel() {
           )}
         </div>
 
-        {!isSafe && current?.decision_engine?.xai_alert && (
-          <div className="flex items-start gap-sm mt-xs text-[11px]" style={{ color: riskColor }}>
-            <span className="material-symbols-outlined text-[14px]">error</span>
-            <span>{current.decision_engine.xai_alert}</span>
-          </div>
-        )}
+        {/* Removed tiny XAI alert since it is now prominently displayed in the main description above */}
 
         {/* Ma trận tác nhân §3.3 */}
         {current?.decision_engine?.factors?.length > 0 && (
