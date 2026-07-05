@@ -23,6 +23,7 @@ export default function Sidebar() {
         <p className="font-body-md text-body-md text-on-surface-variant">Precision Ag v2.4</p>
       </div>
 
+      {/* 
       <button
         onClick={() => navigate("mission-control")}
         className="w-full bg-primary-container hover:bg-primary text-on-primary-container py-sm px-md rounded-lg font-bold mb-md transition-colors flex items-center justify-center gap-xs"
@@ -30,6 +31,7 @@ export default function Sidebar() {
         <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>play_arrow</span>
         Initiate Mission
       </button>
+      */}
 
       <div className="flex-1 flex flex-col gap-xs">
         {navItems.map((item) => {

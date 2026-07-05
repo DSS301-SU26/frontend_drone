@@ -9,7 +9,7 @@ import AiInsights from "./components/ai/AiInsights";
 import SafetyLogs from "./components/logs/SafetyLogs";
 
 function MainLayout() {
-  const { activeNav } = useApp();
+  const { activeNav, toast, error } = useApp();
 
   return (
     <div className="flex bg-background min-h-screen text-on-surface">
@@ -27,6 +27,20 @@ function MainLayout() {
         </main>
       </div>
 
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface px-6 py-3 rounded-lg shadow-elevation-3 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          {toast}
+        </div>
+      )}
+
+      {/* Error Notification */}
+      {error && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-error text-on-error px-6 py-3 rounded-lg shadow-elevation-3 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="font-bold mb-1">Lỗi Hệ Thống</div>
+          <div>{error}</div>
+        </div>
+      )}
 
     </div>
   );
