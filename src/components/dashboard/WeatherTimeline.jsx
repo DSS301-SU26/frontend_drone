@@ -1,5 +1,5 @@
 import { useApp } from "../../context/AppContext";
-import { formatDateTime, formatNumber, formatVisibility, translateWeatherDescription } from "../../utils/helpers";
+import { formatDateTime, formatDateOnly, formatNumber, formatVisibility, translateWeatherDescription } from "../../utils/helpers";
 
 export default function WeatherTimeline() {
   const {
@@ -49,10 +49,10 @@ export default function WeatherTimeline() {
           >
             Bảng tổng quan cả ngày
           </button>
-          <div className="flex items-center gap-xs bg-surface-bright border border-outline-variant px-sm py-xs rounded">
-            <div className="w-2 h-2 rounded-full bg-primary"></div>
+          <div className="flex items-center gap-xs bg-surface-bright border border-outline-variant px-sm py-xs rounded whitespace-nowrap">
+            <span className="material-symbols-outlined text-[16px] text-primary">calendar_today</span>
             <span className="font-body-md text-body-md text-on-surface-variant text-sm">
-              Đồng bộ: {formatDateTime(dashboard.source?.updated_at)}
+              Dữ liệu: <strong className="text-on-surface">{formatDateOnly(dashboard.date || dashboard.slots?.[0]?.timestamp)}</strong>
             </span>
           </div>
         </div>
