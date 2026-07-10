@@ -155,29 +155,11 @@ export default function TopNav() {
           ))}
         </Dropdown>
 
-        {/* Crop Stage Selector */}
-        <Dropdown
-          id="cropStage"
-          trigger={
-            <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm hover:border-outline transition-colors hover:bg-surface-variant">
-              <span className="material-symbols-outlined text-on-surface-variant">grass</span>
-              <span className="font-label-caps text-label-caps text-on-surface">{cropStage}</span>
-              <span className="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
-            </div>
-          }
-        >
-          {["SEEDLING", "TILLERING", "BOOTING", "MATURITY"].map((stage) => (
-            <div
-              key={stage}
-              onClick={() => setCropStage(stage)}
-              className={`flex items-center justify-between px-md py-sm rounded-sm transition-colors cursor-pointer ${
-                stage === cropStage ? "bg-primary/10 text-primary" : "hover:bg-surface-variant text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              <span className="font-label-caps text-label-caps">{stage}</span>
-            </div>
-          ))}
-        </Dropdown>
+        {/* Crop Stage Display (Read-only) */}
+        <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm opacity-80" title="Giai đoạn lúa lấy tự động từ CSDL cánh đồng">
+          <span className="material-symbols-outlined text-on-surface-variant">grass</span>
+          <span className="font-label-caps text-label-caps text-on-surface">{cropStage}</span>
+        </div>
 
         {/* Sync button */}
         <button

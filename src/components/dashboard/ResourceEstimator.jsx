@@ -36,12 +36,7 @@ export default function ResourceEstimator() {
         <div className="flex justify-between items-center py-xs">
           <span className="font-body-md text-sm text-on-surface-variant">Quy mô cánh đồng</span>
           <div className="flex items-center gap-xs">
-            <input
-              type="text"
-              value={farmSize}
-              onChange={(e) => setFarmSize(Math.max(1, parseFloat(e.target.value) || 1))}
-              className="w-16 bg-surface-container-lowest border border-outline-variant rounded px-sm py-xs text-right font-data-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-            />
+            <span className="font-data-mono text-sm text-on-surface font-bold">{farmSize}</span>
             <span className="font-body-md text-sm text-on-surface-variant">ha</span>
           </div>
         </div>
