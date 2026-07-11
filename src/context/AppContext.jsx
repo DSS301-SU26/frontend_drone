@@ -118,7 +118,7 @@ export function AppProvider({ children }) {
     setError("");
     try {
       const activePlot = locations.find(p => p.id === locationId) || locations[0] || PLOTS_DATA[0];
-      const locationForApi = activePlot.plot_name || activePlot.name || activePlot.id || "Dong Thap";
+      const locationForApi = activePlot.location_name || activePlot.province || "Dong Thap";
       const payload = await getDashboardSlots(locationForApi, null, activePlot.area_hectares || activePlot.area || 10.0, distanceKm, droneModel, pesticide, activePlot.current_crop_stage || activePlot.cropStage || "TILLERING");
       setDashboard(payload);
       if (!keepSelected) {
@@ -160,7 +160,7 @@ export function AppProvider({ children }) {
     setAiTrainingRefreshing(true);
     try {
       const activePlot = locations.find(p => p.id === locationId) || locations[0] || PLOTS_DATA[0];
-      const locationForApi = activePlot.plot_name || activePlot.name || activePlot.id || "Dong Thap";
+      const locationForApi = activePlot.location_name || activePlot.province || "Dong Thap";
       const status = await getAiTrainingStatus(locationForApi);
       setAiTraining(status);
       if (showToast) notify(`Đã làm mới phần huấn luyện AI cho ${activePlot.name}.`);
