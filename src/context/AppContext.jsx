@@ -54,7 +54,7 @@ export function AppProvider({ children }) {
   // === Core Data State ===
   const [locations, setLocations] = useState([]);
   const [droneList, setDroneList] = useState([]);
-  const [locationId, setLocationId] = useState("plot_3");
+  const [locationId, setLocationId] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(0);
   const [activeNav, setActiveNav] = useState("mission-control");
@@ -117,8 +117,9 @@ export function AppProvider({ children }) {
     setSyncing(true);
     setError("");
     try {
-      const activePlot = locations.find(p => p.id === locationId) || PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
-      const payload = await getDashboardSlots(activePlot.province || "Tien Giang", null, activePlot.area_hectares || activePlot.area || 10.0, distanceKm, droneModel, pesticide, activePlot.current_crop_stage || activePlot.cropStage || "TILLERING");
+      const activePlot = locations.find(p => p.id === locationId) || locations[0] || PLOTS_DATA[0];
+      const locationForApi = activePlot.plot_name || activePlot.name || activePlot.id || "Dong Thap";
+      const payload = await getDashboardSlots(locationForApi, null, activePlot.area_hectares || activePlot.area || 10.0, distanceKm, droneModel, pesticide, activePlot.current_crop_stage || activePlot.cropStage || "TILLERING");
       setDashboard(payload);
       if (!keepSelected) {
         setSelectedSlot(0);
@@ -135,7 +136,7 @@ export function AppProvider({ children }) {
     } finally {
       setSyncing(false);
     }
-  }, [locationId, distanceKm, droneModel, pesticide, notify]);
+  }, [locationId, locations, distanceKm, droneModel, pesticide, notify]);
 
   const executePipelineRefresh = useCallback(async (showToast = true) => {
     setSyncing(true);
@@ -158,8 +159,9 @@ export function AppProvider({ children }) {
   const loadAiTraining = useCallback(async (showToast = false) => {
     setAiTrainingRefreshing(true);
     try {
-      const activePlot = locations.find(p => p.id === locationId) || PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
-      const status = await getAiTrainingStatus(activePlot.province || "Tien Giang");
+      const activePlot = locations.find(p => p.id === locationId) || locations[0] || PLOTS_DATA[0];
+      const locationForApi = activePlot.plot_name || activePlot.name || activePlot.id || "Dong Thap";
+      const status = await getAiTrainingStatus(locationForApi);
       setAiTraining(status);
       if (showToast) notify(`Đã làm mới phần huấn luyện AI cho ${activePlot.name}.`);
     } catch (requestError) {
@@ -190,7 +192,8 @@ export function AppProvider({ children }) {
 
   // === Effects ===
   useEffect(() => {
-    const activePlot = locations.find(p => p.id === locationId) || PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
+    const activePlot = locations.find(p => p.id === locationId) || locations[0];
+    if (!activePlot) return;
     setFarmSize(activePlot.area_hectares || activePlot.area || 10.0);
     setCropStage(activePlot.current_crop_stage || activePlot.cropStage || "TILLERING");
     setPesticide(activePlot.current_pesticide || activePlot.pesticide || "Tricyclazole");
@@ -199,12 +202,18 @@ export function AppProvider({ children }) {
   useEffect(() => {
     getLocations()
       .then((data) => {
-        if (data && data.length > 0) setLocations(data);
-        else setLocations(PLOTS_DATA);
+        const plotList = (data && data.length > 0) ? data : PLOTS_DATA;
+        setLocations(plotList);
+        if (!locationId && plotList.length > 0) {
+          setLocationId(plotList[0].id);
+        }
       })
       .catch((e) => {
         setError(e.message);
         setLocations(PLOTS_DATA);
+        if (!locationId && PLOTS_DATA.length > 0) {
+          setLocationId(PLOTS_DATA[0].id);
+        }
       });
     getDronesList().then(setDroneList).catch((e) => setError(e.message));
     getDecisionConfig()

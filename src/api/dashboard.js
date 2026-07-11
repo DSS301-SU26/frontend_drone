@@ -11,7 +11,7 @@ async function request(path, options = {}) {
 }
 
 export function getLocations() {
-  return request("/api/locations");
+  return request("/api/plots");
 }
 
 export function getDecisionLog(limit = 100, location = null) {
