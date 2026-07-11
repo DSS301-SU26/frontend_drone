@@ -113,31 +113,33 @@ export default function RecommendationPanel() {
           </div>
         </div>
 
-        <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : flyScore >= 0.80 ? '#1c4a2d' : '#4a3f1c' }}>
-          <div className="flex justify-between items-end mb-xs">
-            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN BAY</span>
-            <span className="font-bold" style={{ color: riskColor }}>{scorePercent}%</span>
-          </div>
-          <div className="w-full bg-surface-container-lowest h-2 rounded-full overflow-hidden mb-sm">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${scorePercent}%`, backgroundColor: riskColor }}></div>
-          </div>
+        {/* Lower content section with padding */}
+        <div className="relative z-10 p-lg pt-0 flex flex-col gap-md">
+          <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : flyScore >= 0.80 ? '#1c4a2d' : '#4a3f1c' }}>
+            <div className="flex justify-between items-end mb-xs">
+              <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN BAY</span>
+              <span className="font-bold" style={{ color: riskColor }}>{scorePercent}%</span>
+            </div>
+            <div className="w-full bg-surface-container-lowest h-2 rounded-full overflow-hidden mb-sm">
+              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${scorePercent}%`, backgroundColor: riskColor }}></div>
+            </div>
 
-          <div className="flex justify-between items-end mb-xs">
-            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN CÂY TRỒNG</span>
-            <span className="font-bold text-primary">{Math.round(cropImpactScore)}</span>
-          </div>
-          <div className="w-full bg-surface-container-lowest h-1.5 rounded-full overflow-hidden mb-sm">
-            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${cropImpactScore}%` }}></div>
-          </div>
+            <div className="flex justify-between items-end mb-xs">
+              <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN CÂY TRỒNG</span>
+              <span className="font-bold text-primary">{Math.round(cropImpactScore)}</span>
+            </div>
+            <div className="w-full bg-surface-container-lowest h-1.5 rounded-full overflow-hidden mb-sm">
+              <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${cropImpactScore}%` }}></div>
+            </div>
 
-          <div className="flex justify-between items-end mb-xs">
-            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM CHẤT LƯỢNG PHUN</span>
-            <span className="font-bold text-primary">{Math.round(sprayQualityScore)}</span>
+            <div className="flex justify-between items-end mb-xs">
+              <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM CHẤT LƯỢNG PHUN</span>
+              <span className="font-bold text-primary">{Math.round(sprayQualityScore)}</span>
+            </div>
+            <div className="w-full bg-surface-container-lowest h-1.5 rounded-full overflow-hidden">
+              <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${sprayQualityScore}%` }}></div>
+            </div>
           </div>
-          <div className="w-full bg-surface-container-lowest h-1.5 rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${sprayQualityScore}%` }}></div>
-          </div>
-        </div>
 
         {/* 3 điểm rủi ro DSS (BRD §2.2) */}
         <div className="grid grid-cols-3 gap-2">
@@ -222,6 +224,7 @@ export default function RecommendationPanel() {
             )}
           </div>
         )}
+        </div>
       </div>
 
       {/* Override Modal */}
