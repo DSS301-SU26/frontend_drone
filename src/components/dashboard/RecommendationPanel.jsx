@@ -42,27 +42,43 @@ export default function RecommendationPanel() {
         <span className="bg-surface-bright border border-outline-variant rounded px-sm py-xs text-[12px] font-data-mono">v2.0</span>
       </div>
 
-      <div className={`${cardBg} border ${cardBorder} rounded-xl p-md flex flex-col gap-md`}>
-        <div className="flex justify-between items-start">
+      <div className={`${cardBg} border ${cardBorder} rounded-xl p-md flex flex-col gap-md relative overflow-hidden`}>
+        {/* Subtle background glow effect based on risk */}
+        <div className="absolute top-0 right-0 w-32 h-32 blur-[60px] opacity-20 pointer-events-none" style={{ backgroundColor: riskColor }}></div>
+
+        <div className="flex justify-between items-start z-10">
           <div className="flex items-center gap-sm">
-            <div className="w-2 h-4 rounded-sm" style={{ backgroundColor: riskColor }}></div>
-            <span className="font-label-caps text-label-caps text-on-surface">
-              {current?.was_human_overridden ? "QUYẾT ĐỊNH GHI ĐÈ BỞI QUẢN TRỊ VIÊN" : "KHUYẾN NGHỊ TỰ ĐỘNG TỪ HỆ THỐNG"}
+            <div className="w-1.5 h-6 rounded-sm" style={{ backgroundColor: riskColor }}></div>
+            <span className="font-label-caps text-[11px] font-bold text-on-surface tracking-widest uppercase">
+              {current?.was_human_overridden ? "Ghi đè bởi quản trị viên" : "Khuyến nghị tự động từ hệ thống"}
             </span>
           </div>
-          <div className="flex flex-col items-end">
-            <span style={{ color: riskColor }} className="font-bold text-sm">Rủi ro:</span>
-            <span style={{ color: riskColor }} className="font-bold">{activeRisk}</span>
+          <div className="flex items-center gap-2 bg-surface-container-highest/80 px-3 py-1 rounded-full border border-outline-variant backdrop-blur-sm">
+            <span className="font-label-caps text-[10px] uppercase text-on-surface-variant">Mức độ rủi ro:</span>
+            <span style={{ color: riskColor }} className="font-bold text-sm tracking-wide">{activeRisk}</span>
           </div>
         </div>
 
-        <div>
-          <h4 className="font-headline-md text-headline-sm font-bold text-white mb-xs">{action.title}</h4>
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            {formatRecommendationText(current?.xai_alert || current?.decision_engine?.xai_alert || current?.xai_explanation) || action.description}
-          </p>
+        <div className="z-10 mt-1">
+          {(() => {
+            const rawText = current?.xai_alert || current?.decision_engine?.xai_alert || current?.xai_explanation;
+            const formattedText = formatRecommendationText(rawText) || action.description;
+            const parts = formattedText.split(" — ");
+            const displayTitle = parts.length > 1 ? parts[0] : action.title;
+            const displayContent = parts.length > 1 ? parts.slice(1).join(" — ") : formattedText;
+
+            return (
+              <>
+                <h4 className="font-display-sm text-[22px] font-bold text-white mb-3 tracking-tight">{displayTitle}</h4>
+                <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
+                  {displayContent}
+                </p>
+              </>
+            );
+          })()}
+
           {current?.was_human_overridden && current?.user_notes && (
-            <div className="mt-sm p-sm bg-surface-container-high rounded-lg border-l-2 border-primary">
+            <div className="mt-md p-sm bg-surface-container-high rounded-lg border-l-2 border-primary">
               <span className="font-label-caps text-primary text-[10px] uppercase block mb-1">Ghi chú của quản trị viên:</span>
               <p className="text-on-surface text-sm italic">{current.user_notes}</p>
             </div>
