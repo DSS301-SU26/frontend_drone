@@ -36,16 +36,16 @@ import {
 
 
 const PLOTS_DATA = [
-  { id: "plot_1", name: "Vườn Lúa Tiền Giang", province: "Tien Giang", area: 2.5, cropStage: "SEEDLING", lat: 10.25, lng: 106.33 },
-  { id: "plot_3", name: "Vườn Lúa Đồng Tháp", province: "Dong Thap", area: 5.0, cropStage: "TILLERING", lat: 10.45, lng: 105.63 },
-  { id: "plot_5", name: "Vườn Lúa An Giang", province: "An Giang", area: 10.0, cropStage: "BOOTING", lat: 10.38, lng: 105.42 },
-  { id: "plot_7", name: "Vườn Lúa Cần Thơ", province: "Can Tho", area: 1.5, cropStage: "GRAIN_FILLING", lat: 10.03, lng: 105.78 },
-  { id: "plot_9", name: "Vườn Lúa Long An", province: "Long An", area: 6.0, cropStage: "TILLERING", lat: 10.53, lng: 106.38 },
-  { id: "plot_11", name: "Vườn Mẫu Đồng Tháp", province: "Dong Thap", area: 15.0, cropStage: "SEEDLING", lat: 10.42, lng: 105.68 },
-  { id: "plot_12", name: "Ruộng Thử Nghiệm An Giang", province: "An Giang", area: 2.8, cropStage: "GRAIN_FILLING", lat: 10.39, lng: 105.45 },
-  { id: "plot_13", name: "Nông Trại Cần Thơ", province: "Can Tho", area: 5.5, cropStage: "BOOTING", lat: 10.05, lng: 105.75 },
-  { id: "plot_14", name: "Vườn Rau Củ Chi - Hồ Chí Minh", province: "Ho Chi Minh", area: 4.5, cropStage: "TILLERING", lat: 10.95, lng: 106.50 },
-  { id: "plot_15", name: "Nông Trại Gia Lâm - Hà Nội", province: "Ha Noi", area: 3.5, cropStage: "GRAIN_FILLING", lat: 21.02, lng: 105.90 }
+  { id: "plot_1", name: "Vườn Lúa Tiền Giang", province: "Tien Giang", area: 2.5, cropStage: "SEEDLING", pesticide: "Tricyclazole", lat: 10.25, lng: 106.33 },
+  { id: "plot_3", name: "Vườn Lúa Đồng Tháp", province: "Dong Thap", area: 5.0, cropStage: "TILLERING", pesticide: "Abamectin", lat: 10.45, lng: 105.63 },
+  { id: "plot_5", name: "Vườn Lúa An Giang", province: "An Giang", area: 10.0, cropStage: "BOOTING", pesticide: "Hexaconazole", lat: 10.38, lng: 105.42 },
+  { id: "plot_7", name: "Vườn Lúa Cần Thơ", province: "Can Tho", area: 1.5, cropStage: "GRAIN_FILLING", pesticide: "Tricyclazole", lat: 10.03, lng: 105.78 },
+  { id: "plot_9", name: "Vườn Lúa Long An", province: "Long An", area: 6.0, cropStage: "TILLERING", pesticide: "Abamectin", lat: 10.53, lng: 106.38 },
+  { id: "plot_11", name: "Vườn Mẫu Đồng Tháp", province: "Dong Thap", area: 15.0, cropStage: "SEEDLING", pesticide: "Hexaconazole", lat: 10.42, lng: 105.68 },
+  { id: "plot_12", name: "Ruộng Thử Nghiệm An Giang", province: "An Giang", area: 2.8, cropStage: "GRAIN_FILLING", pesticide: "Tricyclazole", lat: 10.39, lng: 105.45 },
+  { id: "plot_13", name: "Nông Trại Cần Thơ", province: "Can Tho", area: 5.5, cropStage: "BOOTING", pesticide: "Abamectin", lat: 10.05, lng: 105.75 },
+  { id: "plot_14", name: "Vườn Rau Củ Chi - Hồ Chí Minh", province: "Ho Chi Minh", area: 4.5, cropStage: "TILLERING", pesticide: "Hexaconazole", lat: 10.95, lng: 106.50 },
+  { id: "plot_15", name: "Nông Trại Gia Lâm - Hà Nội", province: "Ha Noi", area: 3.5, cropStage: "GRAIN_FILLING", pesticide: "Tricyclazole", lat: 21.02, lng: 105.90 }
 ];
 
 const AppContext = createContext(null);
@@ -193,6 +193,7 @@ export function AppProvider({ children }) {
     const activePlot = PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
     setFarmSize(activePlot.area);
     setCropStage(activePlot.cropStage);
+    setPesticide(activePlot.pesticide);
   }, [locationId]);
 
   useEffect(() => {

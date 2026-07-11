@@ -131,29 +131,11 @@ export default function TopNav() {
           ))}
         </Dropdown>
 
-        {/* Pesticide Selector */}
-        <Dropdown
-          id="pesticide"
-          trigger={
-            <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm hover:border-outline transition-colors hover:bg-surface-variant">
-              <span className="material-symbols-outlined text-on-surface-variant">science</span>
-              <span className="font-label-caps text-label-caps text-on-surface">{pesticide}</span>
-              <span className="material-symbols-outlined text-on-surface-variant">arrow_drop_down</span>
-            </div>
-          }
-        >
-          {["Tricyclazole", "Abamectin", "Hexaconazole"].map((chem) => (
-            <div
-              key={chem}
-              onClick={() => setPesticide(chem)}
-              className={`flex items-center justify-between px-md py-sm rounded-sm transition-colors cursor-pointer ${
-                chem === pesticide ? "bg-primary/10 text-primary" : "hover:bg-surface-variant text-on-surface-variant hover:text-on-surface"
-              }`}
-            >
-              <span className="font-label-caps text-label-caps">{chem}</span>
-            </div>
-          ))}
-        </Dropdown>
+        {/* Pesticide Display (Read-only) */}
+        <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm opacity-80" title="Loại thuốc lấy tự động từ CSDL cánh đồng">
+          <span className="material-symbols-outlined text-on-surface-variant">science</span>
+          <span className="font-label-caps text-label-caps text-on-surface">{pesticide}</span>
+        </div>
 
         {/* Crop Stage Display (Read-only) */}
         <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm opacity-80" title="Giai đoạn lúa lấy tự động từ CSDL cánh đồng">
