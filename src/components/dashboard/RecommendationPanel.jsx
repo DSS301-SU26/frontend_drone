@@ -95,8 +95,19 @@ export default function RecommendationPanel() {
                     </h4>
                   </div>
                   {(() => {
+                    let reason = displayContent;
+                    let rec = "";
+                    let splitFound = false;
+
                     if (displayContent.includes("→ Đề xuất:")) {
-                      const [reason, rec] = displayContent.split("→ Đề xuất:");
+                      [reason, rec] = displayContent.split("→ Đề xuất:");
+                      splitFound = true;
+                    } else if (displayContent.includes(" — đề xuất ")) {
+                      [reason, rec] = displayContent.split(" — đề xuất ");
+                      splitFound = true;
+                    }
+
+                    if (splitFound) {
                       return (
                         <div className="flex flex-col gap-3">
                           <p className="font-body-md text-[14px] text-white/85 leading-relaxed font-normal">
