@@ -117,8 +117,8 @@ export function AppProvider({ children }) {
     setSyncing(true);
     setError("");
     try {
-      const activePlot = PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
-      const payload = await getDashboardSlots(activePlot.province, null, activePlot.area, distanceKm, droneModel, pesticide, activePlot.cropStage);
+      const activePlot = locations.find(p => p.id === locationId) || PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
+      const payload = await getDashboardSlots(activePlot.province || "Tien Giang", null, activePlot.area_hectares || activePlot.area || 10.0, distanceKm, droneModel, pesticide, activePlot.current_crop_stage || activePlot.cropStage || "TILLERING");
       setDashboard(payload);
       if (!keepSelected) {
         setSelectedSlot(0);
@@ -158,8 +158,8 @@ export function AppProvider({ children }) {
   const loadAiTraining = useCallback(async (showToast = false) => {
     setAiTrainingRefreshing(true);
     try {
-      const activePlot = PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
-      const status = await getAiTrainingStatus(activePlot.province);
+      const activePlot = locations.find(p => p.id === locationId) || PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
+      const status = await getAiTrainingStatus(activePlot.province || "Tien Giang");
       setAiTraining(status);
       if (showToast) notify(`Đã làm mới phần huấn luyện AI cho ${activePlot.name}.`);
     } catch (requestError) {
@@ -190,14 +190,22 @@ export function AppProvider({ children }) {
 
   // === Effects ===
   useEffect(() => {
-    const activePlot = PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
-    setFarmSize(activePlot.area);
-    setCropStage(activePlot.cropStage);
-    setPesticide(activePlot.pesticide);
-  }, [locationId]);
+    const activePlot = locations.find(p => p.id === locationId) || PLOTS_DATA.find(p => p.id === locationId) || PLOTS_DATA[2];
+    setFarmSize(activePlot.area_hectares || activePlot.area || 10.0);
+    setCropStage(activePlot.current_crop_stage || activePlot.cropStage || "TILLERING");
+    setPesticide(activePlot.current_pesticide || activePlot.pesticide || "Tricyclazole");
+  }, [locationId, locations]);
 
   useEffect(() => {
-    setLocations(PLOTS_DATA);
+    getLocations()
+      .then((data) => {
+        if (data && data.length > 0) setLocations(data);
+        else setLocations(PLOTS_DATA);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setLocations(PLOTS_DATA);
+      });
     getDronesList().then(setDroneList).catch((e) => setError(e.message));
     getDecisionConfig()
       .then((config) => { setDecisionConfig(config); setRuleForm(config.thresholds ?? {}); })
