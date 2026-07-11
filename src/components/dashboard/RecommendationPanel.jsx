@@ -59,24 +59,24 @@ export default function RecommendationPanel() {
         <div className="absolute -bottom-10 -left-10 w-40 h-40 blur-[60px] opacity-20 rounded-full" 
              style={{ backgroundColor: riskColor }}></div>
 
-        <div className="relative z-10 p-xl flex flex-col gap-md">
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-8 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]" style={{ backgroundColor: riskColor }}></div>
-              <span className="font-label-caps text-[12px] font-bold text-white/90 tracking-widest uppercase">
-                {current?.was_human_overridden ? "Ghi đè bởi quản trị viên" : "Khuyến nghị tự động từ hệ thống"}
+        <div className="relative z-10 p-lg flex flex-col gap-sm">
+          <div className="flex justify-between items-start mb-1">
+            <div className="flex items-center gap-sm">
+              <div className="w-1.5 h-6 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]" style={{ backgroundColor: riskColor }}></div>
+              <span className="font-label-caps text-[11px] font-bold text-white/90 tracking-widest uppercase">
+                {current?.was_human_overridden ? "Ghi đè bởi QTV" : "Khuyến nghị từ hệ thống"}
               </span>
             </div>
             
             {/* Premium Glassmorphism Risk Badge */}
-            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border backdrop-blur-md shadow-lg"
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full border backdrop-blur-md shadow-md"
                  style={{ backgroundColor: `${riskColor}15`, borderColor: `${riskColor}40` }}>
-              <span className="font-label-caps text-[10px] uppercase text-white/70 font-bold tracking-wider">Mức độ rủi ro:</span>
-              <span style={{ color: riskColor, textShadow: `0 0 10px ${riskColor}80` }} className="font-bold text-sm uppercase tracking-widest">{activeRisk}</span>
+              <span className="font-label-caps text-[9px] uppercase text-white/70 font-bold tracking-wider">Mức độ rủi ro:</span>
+              <span style={{ color: riskColor, textShadow: `0 0 8px ${riskColor}80` }} className="font-bold text-[11px] uppercase tracking-widest">{activeRisk}</span>
             </div>
           </div>
 
-          <div className="mt-2">
+          <div className="mt-1">
             {(() => {
               const rawText = current?.xai_alert || current?.decision_engine?.xai_alert || current?.xai_explanation;
               const formattedText = formatRecommendationText(rawText) || action.description;
@@ -86,15 +86,15 @@ export default function RecommendationPanel() {
 
               return (
                 <>
-                  <div className="flex items-center gap-3 mb-4">
-                    <span className="material-symbols-outlined text-[36px] drop-shadow-lg" style={{ color: riskColor }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="material-symbols-outlined text-[24px] drop-shadow-md" style={{ color: riskColor }}>
                       {actionIcon}
                     </span>
-                    <h4 className="font-display-md text-3xl font-extrabold text-white tracking-tight drop-shadow-md">
+                    <h4 className="font-display-sm text-[20px] font-bold text-white tracking-tight drop-shadow-sm">
                       {displayTitle}
                     </h4>
                   </div>
-                  <p className="font-body-lg text-lg text-white/80 leading-relaxed font-light">
+                  <p className="font-body-md text-[15px] text-white/80 leading-relaxed font-normal">
                     {displayContent}
                   </p>
                 </>
