@@ -32,57 +32,85 @@ export default function RecommendationPanel() {
   const cardBg = isHighRisk ? "bg-[#1a0f11]" : flyScore >= 0.80 ? "bg-[#0f1a14]" : "bg-[#1a170f]";
   const cardBorder = isHighRisk ? "border-[#4a1c1c]" : flyScore >= 0.80 ? "border-[#1c4a2d]" : "border-[#4a3f1c]";
 
+  // Icons based on decision action
+  const actionIcon = {
+    FLY: "check_circle",
+    DELAY: "schedule",
+    LOCK_SPRAY: "water_drop",
+    NO_FLY: "block"
+  }[current?.decision_action] || "info";
+
   return (
-    <div className="col-span-1 md:col-span-4 bg-surface-container rounded-xl border border-surface-variant p-lg flex flex-col gap-md">
+    <div className="col-span-1 md:col-span-4 bg-surface-container rounded-xl border border-surface-variant p-lg flex flex-col gap-md shadow-lg">
       <div className="flex justify-between items-center mb-sm">
         <div>
-          <h2 className="font-label-caps text-primary text-label-caps uppercase tracking-wider mb-base">TRẠNG THÁI KHUYẾN NGHỊ</h2>
-          <h3 className="font-headline-sm text-headline-sm font-bold">Decision Engine Output</h3>
+          <h2 className="font-label-caps text-primary text-[10px] uppercase tracking-[0.2em] mb-1">Hệ Thống Trí Tuệ Nhân Tạo</h2>
+          <h3 className="font-headline-sm text-headline-sm font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Decision Engine Output</h3>
         </div>
-        <span className="bg-surface-bright border border-outline-variant rounded px-sm py-xs text-[12px] font-data-mono">v2.0</span>
+        <span className="bg-surface-bright border border-outline-variant rounded-full px-3 py-1 text-[11px] font-data-mono font-bold text-primary shadow-[0_0_10px_rgba(75,221,183,0.1)]">v2.0</span>
       </div>
 
-      <div className={`${cardBg} border ${cardBorder} rounded-xl p-md flex flex-col gap-md relative overflow-hidden`}>
-        {/* Subtle background glow effect based on risk */}
-        <div className="absolute top-0 right-0 w-32 h-32 blur-[60px] opacity-20 pointer-events-none" style={{ backgroundColor: riskColor }}></div>
+      <div className={`relative overflow-hidden rounded-2xl border ${cardBorder} shadow-2xl transition-all duration-500`}
+           style={{ background: `linear-gradient(145deg, ${cardBg}, #0a0a0a)` }}>
+        
+        {/* Dynamic Animated Glow Effect */}
+        <div className="absolute -top-20 -right-20 w-64 h-64 blur-[80px] opacity-30 rounded-full animate-pulse" 
+             style={{ backgroundColor: riskColor, animationDuration: '4s' }}></div>
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 blur-[60px] opacity-20 rounded-full" 
+             style={{ backgroundColor: riskColor }}></div>
 
-        <div className="flex justify-between items-start z-10">
-          <div className="flex items-center gap-sm">
-            <div className="w-1.5 h-6 rounded-sm" style={{ backgroundColor: riskColor }}></div>
-            <span className="font-label-caps text-[11px] font-bold text-on-surface tracking-widest uppercase">
-              {current?.was_human_overridden ? "Ghi đè bởi quản trị viên" : "Khuyến nghị tự động từ hệ thống"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 bg-surface-container-highest/80 px-3 py-1 rounded-full border border-outline-variant backdrop-blur-sm">
-            <span className="font-label-caps text-[10px] uppercase text-on-surface-variant">Mức độ rủi ro:</span>
-            <span style={{ color: riskColor }} className="font-bold text-sm tracking-wide">{activeRisk}</span>
-          </div>
-        </div>
-
-        <div className="z-10 mt-1">
-          {(() => {
-            const rawText = current?.xai_alert || current?.decision_engine?.xai_alert || current?.xai_explanation;
-            const formattedText = formatRecommendationText(rawText) || action.description;
-            const parts = formattedText.split(" — ");
-            const displayTitle = parts.length > 1 ? parts[0] : action.title;
-            const displayContent = parts.length > 1 ? parts.slice(1).join(" — ") : formattedText;
-
-            return (
-              <>
-                <h4 className="font-display-sm text-[22px] font-bold text-white mb-3 tracking-tight">{displayTitle}</h4>
-                <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
-                  {displayContent}
-                </p>
-              </>
-            );
-          })()}
-
-          {current?.was_human_overridden && current?.user_notes && (
-            <div className="mt-md p-sm bg-surface-container-high rounded-lg border-l-2 border-primary">
-              <span className="font-label-caps text-primary text-[10px] uppercase block mb-1">Ghi chú của quản trị viên:</span>
-              <p className="text-on-surface text-sm italic">{current.user_notes}</p>
+        <div className="relative z-10 p-xl flex flex-col gap-md">
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-8 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]" style={{ backgroundColor: riskColor }}></div>
+              <span className="font-label-caps text-[12px] font-bold text-white/90 tracking-widest uppercase">
+                {current?.was_human_overridden ? "Ghi đè bởi quản trị viên" : "Khuyến nghị tự động từ hệ thống"}
+              </span>
             </div>
-          )}
+            
+            {/* Premium Glassmorphism Risk Badge */}
+            <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border backdrop-blur-md shadow-lg"
+                 style={{ backgroundColor: `${riskColor}15`, borderColor: `${riskColor}40` }}>
+              <span className="font-label-caps text-[10px] uppercase text-white/70 font-bold tracking-wider">Mức độ rủi ro:</span>
+              <span style={{ color: riskColor, textShadow: `0 0 10px ${riskColor}80` }} className="font-bold text-sm uppercase tracking-widest">{activeRisk}</span>
+            </div>
+          </div>
+
+          <div className="mt-2">
+            {(() => {
+              const rawText = current?.xai_alert || current?.decision_engine?.xai_alert || current?.xai_explanation;
+              const formattedText = formatRecommendationText(rawText) || action.description;
+              const parts = formattedText.split(" — ");
+              const displayTitle = parts.length > 1 ? parts[0] : action.title;
+              const displayContent = parts.length > 1 ? parts.slice(1).join(" — ") : formattedText;
+
+              return (
+                <>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="material-symbols-outlined text-[36px] drop-shadow-lg" style={{ color: riskColor }}>
+                      {actionIcon}
+                    </span>
+                    <h4 className="font-display-md text-3xl font-extrabold text-white tracking-tight drop-shadow-md">
+                      {displayTitle}
+                    </h4>
+                  </div>
+                  <p className="font-body-lg text-lg text-white/80 leading-relaxed font-light">
+                    {displayContent}
+                  </p>
+                </>
+              );
+            })()}
+
+            {current?.was_human_overridden && current?.user_notes && (
+              <div className="mt-lg p-md bg-white/5 backdrop-blur-sm rounded-xl border-l-4 shadow-inner" style={{ borderColor: riskColor }}>
+                <span className="font-label-caps text-[11px] uppercase block mb-2 font-bold tracking-wider" style={{ color: riskColor }}>
+                  <span className="material-symbols-outlined text-[14px] align-middle mr-1">speaker_notes</span>
+                  Ghi chú của quản trị viên:
+                </span>
+                <p className="text-white/90 text-base italic leading-relaxed">"{current.user_notes}"</p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : flyScore >= 0.80 ? '#1c4a2d' : '#4a3f1c' }}>
