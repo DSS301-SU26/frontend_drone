@@ -542,20 +542,22 @@ export function translateWeatherDescription(description) {
 export function formatRecommendationText(text) {
   if (!text) return "--";
   return `${text}`
-    .replace(/^FLY:/, "Có thể cất cánh:")
-    .replace(/^LOCK_SPRAY:/, "Khóa lệnh phun:")
-    .replace(/^NO_FLY:/, "Đưa UAV về trạm sạc:")
-    .replace(/^DELAY:/, "Nên hoãn chuyến bay:")
-    .replace("Dieu kien bay chap nhan duoc.", "Điều kiện bay chấp nhận được.")
-    .replace(/Gio ([\d.]+) km\/h, gio giat ([\d.]+) km\/h, xac suat mua ([\d.]+)%\./, "Gió $1 km/h, gió giật $2 km/h, khả năng mưa $3%.")
-    .replace(/De xuat flow-rate ([\d.]+)%\./, "Mức phun đề xuất $1%.")
-    .replace("Khoa lenh phun vi gio/gio giat vuot nguong an toan", "Khóa phun vì gió hoặc gió giật vượt ngưỡng an toàn")
-    .replace("Tranh pesticide drift va mat on dinh UAV.", "Tránh thuốc bị gió cuốn lệch và giữ UAV ổn định.")
-    .replace("Thoi tiet mua/nguy hiem", "Thời tiết có mưa hoặc nguy hiểm")
-    .replace("xac suat mua", "khả năng mưa")
-    .replace("Dua drone ve tram sac de bao ve thiet bi.", "Đưa UAV về trạm sạc để bảo vệ thiết bị.")
-    .replace(/Tam hoan bay do nhiet do ([\d.]+)C hoac rui ro mua ([\d.]+)%\./, "Tạm hoãn bay do nhiệt độ $1°C hoặc rủi ro mưa $2%.")
-    .replace("Kiem tra lai khung gio ke tiep.", "Kiểm tra lại khung giờ kế tiếp.");
+    // Xóa prefix mã kỹ thuật nếu backend cũ vẫn gửi về
+    .replace(/^FLY:\s*/, "")
+    .replace(/^LOCK_SPRAY:\s*/, "Khóa lệnh phun — ")
+    .replace(/^NO_FLY:\s*/, "Cấm cất cánh — ")
+    .replace(/^DELAY:\s*/, "Tạm hoãn — ")
+    // Xử lý legacy text không dấu từ engine cũ
+    .replace("Quyet dinh:", "Quyết định:")
+    .replace("Diem:", "Điểm:")
+    .replace("An toan bay", "An toàn bay")
+    .replace("Tac dong lua", "Tác động lúa")
+    .replace("Chat luong phun", "Chất lượng phun")
+    .replace("KHOA CUNG do:", "KHÓA CỨNG do:")
+    .replace("Yeu to phai dung:", "Yếu tố phải dừng:")
+    .replace("Canh bao:", "Cảnh báo:")
+    .replace("Dieu kien dat nguong an toan - cho phep cat canh.", "Điều kiện đạt ngưỡng an toàn — cho phép cất cánh.")
+    .replace("OVERRIDE boi nguoi dung:", "GHI ĐÈ bởi người dùng:");
 }
 
 export function clamp(value, min, max) {
