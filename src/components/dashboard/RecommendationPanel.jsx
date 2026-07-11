@@ -94,9 +94,29 @@ export default function RecommendationPanel() {
                       {displayTitle}
                     </h4>
                   </div>
-                  <p className="font-body-md text-[15px] text-white/80 leading-relaxed font-normal">
-                    {displayContent}
-                  </p>
+                  {(() => {
+                    if (displayContent.includes("→ Đề xuất:")) {
+                      const [reason, rec] = displayContent.split("→ Đề xuất:");
+                      return (
+                        <div className="flex flex-col gap-3">
+                          <p className="font-body-md text-[14px] text-white/85 leading-relaxed font-normal">
+                            {reason.trim()}
+                          </p>
+                          <div className="flex items-start gap-2 bg-[#1a2b25]/40 p-3 rounded-lg border border-[#2a4539] shadow-inner">
+                            <span className="material-symbols-outlined text-[16px] text-[#4bddb7] mt-0.5">lightbulb</span>
+                            <p className="font-body-md text-[14px] text-[#b3f0dd] leading-relaxed font-medium">
+                              <span className="font-bold text-[#4bddb7]">Đề xuất:</span> {rec.trim()}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <p className="font-body-md text-[14px] text-white/85 leading-relaxed font-normal">
+                        {displayContent}
+                      </p>
+                    );
+                  })()}
                 </>
               );
             })()}
