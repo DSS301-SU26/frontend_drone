@@ -20,17 +20,18 @@ export default function RecommendationPanel() {
   const flyScore = current?.decision_engine?.flyability_score ?? 0;
   const scorePercent = Math.round(flyScore * 100);
   const isSafe = current?.decision_engine?.is_safe_to_fly;
-  const isHighRisk = flyScore < 0.50;
   const cropImpactScore = current?.decision_engine?.crop_impact_score ?? 100;
   const sprayQualityScore = current?.decision_engine?.spray_quality_score ?? 100;
   const flowRate = current?.decision_engine?.resource_regressor?.flow_rate_l_ha ?? 0;
   const cropScore = Math.round(current?.decision_engine?.crop_impact_score ?? 0);
   const sprayScore = Math.round(current?.decision_engine?.spray_quality_score ?? 0);
 
-  // Determine risk color
-  const riskColor = isHighRisk ? "#ff4a4a" : flyScore >= 0.80 ? "#4bddb7" : "#f0bf63";
-  const cardBg = isHighRisk ? "bg-[#1a0f11]" : flyScore >= 0.80 ? "bg-[#0f1a14]" : "bg-[#1a170f]";
-  const cardBorder = isHighRisk ? "border-[#4a1c1c]" : flyScore >= 0.80 ? "border-[#1c4a2d]" : "border-[#4a3f1c]";
+  // Determine risk color based on actual derived risk level, not just the base flyScore
+  const isHighRisk = activeRisk === "Cao";
+  const isMediumRisk = activeRisk === "Trung bình";
+  const riskColor = isHighRisk ? "#ff4a4a" : isMediumRisk ? "#f0bf63" : "#4bddb7";
+  const cardBg = isHighRisk ? "bg-[#1a0f11]" : isMediumRisk ? "bg-[#1a170f]" : "bg-[#0f1a14]";
+  const cardBorder = isHighRisk ? "border-[#4a1c1c]" : isMediumRisk ? "border-[#4a3f1c]" : "border-[#1c4a2d]";
 
   // Icons based on decision action
   const actionIcon = {
@@ -146,7 +147,7 @@ export default function RecommendationPanel() {
 
         {/* Lower content section with padding */}
         <div className="relative z-10 p-lg pt-0 flex flex-col gap-md">
-          <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : flyScore >= 0.80 ? '#1c4a2d' : '#4a3f1c' }}>
+          <div className={`border-t pt-md mt-xs`} style={{ borderColor: isHighRisk ? '#4a1c1c' : isMediumRisk ? '#4a3f1c' : '#1c4a2d' }}>
             <div className="flex justify-between items-end mb-xs">
               <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN BAY</span>
               <span className="font-bold" style={{ color: riskColor }}>{scorePercent}%</span>

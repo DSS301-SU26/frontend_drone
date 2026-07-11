@@ -73,9 +73,15 @@ export function getDecisionAction(slot) {
 }
 
 export function getRiskLevel(slot) {
+  if (slot.decision_engine?.risk_level) return slot.decision_engine.risk_level;
+  
+  const action = getDecisionAction(slot);
+  if (action === "NO_FLY" || action === "LOCK_SPRAY") return "HIGH";
+  if (action === "DELAY") return "MEDIUM";
+
   const score = slot.decision_engine?.flyability_score ?? 0;
-  if (score > 0.80) return "LOW";
-  if (score >= 0.50) return "MEDIUM";
+  if (score >= 0.70) return "LOW";
+  if (score >= 0.40) return "MEDIUM";
   return "HIGH";
 }
 
