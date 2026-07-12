@@ -153,61 +153,14 @@ export default function TerrainMaps() {
                 <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${showBoundaries ? 'right-0.5 bg-on-primary' : 'left-0.5 bg-outline-variant'}`}></span>
               </button>
             </div>
-            
-            {/* Toggle 2: NDVI */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between group cursor-pointer" onClick={() => setShowNdvi(!showNdvi)}>
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-sm">compost</span>
-                  <span className="font-body-md text-body-md text-on-surface">NDVI (Sức khỏe Cây trồng)</span>
-                </div>
-                <button className={`w-10 h-5 rounded-full relative transition-colors ${showNdvi ? 'bg-primary-container shadow-[0_0_8px_rgba(0,184,148,0.3)]' : 'bg-surface-container-highest border border-outline-variant'}`}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${showNdvi ? 'right-0.5 bg-on-primary' : 'left-0.5 bg-outline-variant'}`}></span>
-                </button>
-              </div>
-              {/* Opacity Slider */}
-              <div className="pl-8 flex items-center gap-3">
-                <span className="material-symbols-outlined text-on-surface-variant text-xs">opacity</span>
-                <div className="flex-1 h-1 bg-surface-container-highest rounded-full relative cursor-pointer">
-                  <div className="absolute left-0 top-0 h-full w-[65%] bg-primary rounded-full"></div>
-                  <div className="absolute left-[65%] top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-primary border-2 border-surface-container-low rounded-full shadow-sm hover:scale-125 transition-transform"></div>
-                </div>
-                <span className="font-data-mono text-[10px] text-on-surface-variant">65%</span>
-              </div>
-            </div>
-
-            {/* Toggle 3: Elevation */}
-            <div className="flex items-center justify-between group cursor-pointer">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors text-sm">terrain</span>
-                <span className="font-body-md text-body-md text-on-surface-variant">Bản đồ Độ cao</span>
-              </div>
-              <button className="w-10 h-5 bg-surface-container-highest border border-outline-variant rounded-full relative transition-colors">
-                <span className="absolute left-0.5 top-0.5 w-4 h-4 bg-outline-variant rounded-full"></span>
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* Measurement Tools Card */}
+        {/* Plot Info Card */}
         <div className="bg-surface-container-low/95 backdrop-blur-xl border border-outline-variant rounded-xl p-md shadow-2xl mt-2">
           <div className="flex items-center gap-2 mb-4 border-b border-outline-variant pb-3">
-            <span className="material-symbols-outlined text-primary">architecture</span>
-            <h3 className="font-headline-sm text-headline-sm text-on-surface">Đo lường</h3>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button className="flex flex-col items-center justify-center p-3 rounded-lg bg-surface-container-high border border-outline-variant hover:border-primary hover:text-primary text-on-surface-variant transition-all group">
-              <span className="material-symbols-outlined mb-1 text-[20px] group-hover:scale-110 transition-transform">straighten</span>
-              <span className="font-label-caps text-[10px] uppercase">Khoảng cách</span>
-            </button>
-            <button className="flex flex-col items-center justify-center p-3 rounded-lg bg-primary/10 border border-primary text-primary transition-all shadow-[0_0_12px_rgba(0,184,148,0.4)]">
-              <span className="material-symbols-outlined mb-1 text-[20px]">area_chart</span>
-              <span className="font-label-caps text-[10px] uppercase">Diện tích</span>
-            </button>
-            <button className="flex flex-col items-center justify-center p-3 rounded-lg bg-surface-container-high border border-outline-variant hover:border-primary hover:text-primary text-on-surface-variant transition-all group">
-              <span className="material-symbols-outlined mb-1 text-[20px] group-hover:scale-110 transition-transform">location_on</span>
-              <span className="font-label-caps text-[10px] uppercase">Đánh dấu</span>
-            </button>
+            <span className="material-symbols-outlined text-primary">info</span>
+            <h3 className="font-headline-sm text-headline-sm text-on-surface">Thông tin Lô đất</h3>
           </div>
           
           {/* Active Measurement Readout */}
