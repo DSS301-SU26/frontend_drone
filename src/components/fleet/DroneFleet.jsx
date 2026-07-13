@@ -14,10 +14,12 @@ export default function DroneFleet() {
     tank_capacity_liters: 30.0, spray_system_type: "CENTRIFUGAL", ip_rating: "IP67", image_url: "", notes: ""
   };
   const [formData, setFormData] = useState(initialForm);
+  const [formErrors, setFormErrors] = useState({});
 
   const openAddModal = () => {
     setEditingDroneId(null);
     setFormData(initialForm);
+    setFormErrors({});
     setModalOpen(true);
   };
 
@@ -34,12 +36,23 @@ export default function DroneFleet() {
       image_url: drone.image_url || "",
       notes: drone.notes || ""
     });
+    setFormErrors({});
     setModalOpen(true);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.model_name.trim()) return notify("Vui lòng nhập tên Model.");
+    
+    // Frontend validation
+    const errors = {};
+    if (!formData.model_name || !formData.model_name.trim()) errors.model_name = "Vui lòng nhập tên Model.";
+    if (formData.max_wind_resistance_kph === "" || isNaN(formData.max_wind_resistance_kph)) errors.max_wind_resistance_kph = "Vui lòng nhập Kháng gió.";
+    if (formData.max_gust_resistance_kph === "" || isNaN(formData.max_gust_resistance_kph)) errors.max_gust_resistance_kph = "Vui lòng nhập Kháng gió giật.";
+    if (formData.tank_capacity_liters === "" || isNaN(formData.tank_capacity_liters)) errors.tank_capacity_liters = "Vui lòng nhập Dung tích bình.";
+    
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSubmitting(true);
     try {
       if (editingDroneId) {
@@ -286,11 +299,12 @@ export default function DroneFleet() {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </header>
-            <form onSubmit={handleSave} className="flex flex-col p-lg gap-md overflow-y-auto">
+            <form onSubmit={handleSave} noValidate className="flex flex-col p-lg gap-md overflow-y-auto">
               <div className="flex flex-col gap-xs">
-                <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Tên Model</label>
-                <input type="text" className="bg-surface-container-highest border border-outline-variant rounded px-sm py-xs text-on-surface focus:outline-none focus:border-primary" 
+                <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Tên Model <span className="text-error">*</span></label>
+                <input type="text" className={`bg-surface-container-highest border rounded px-sm py-xs text-on-surface focus:outline-none ${formErrors.model_name ? 'border-error' : 'border-outline-variant focus:border-primary'}`} 
                   value={formData.model_name} onChange={e => setFormData({...formData, model_name: e.target.value})} placeholder="Vd: DJI_T40" required />
+                {formErrors.model_name && <span className="text-error text-[12px]">{formErrors.model_name}</span>}
               </div>
               <div className="flex flex-col gap-xs">
                 <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Link Ảnh (URL)</label>
@@ -304,21 +318,24 @@ export default function DroneFleet() {
               </div>
               <div className="grid grid-cols-2 gap-md">
                 <div className="flex flex-col gap-xs">
-                  <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Kháng gió (km/h)</label>
-                  <input type="number" step="0.1" className="bg-surface-container-highest border border-outline-variant rounded px-sm py-xs text-on-surface focus:outline-none focus:border-primary" 
+                  <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Kháng gió (km/h) <span className="text-error">*</span></label>
+                  <input type="number" step="0.1" className={`bg-surface-container-highest border rounded px-sm py-xs text-on-surface focus:outline-none ${formErrors.max_wind_resistance_kph ? 'border-error' : 'border-outline-variant focus:border-primary'}`} 
                     value={formData.max_wind_resistance_kph} onChange={e => setFormData({...formData, max_wind_resistance_kph: parseFloat(e.target.value)})} required />
+                  {formErrors.max_wind_resistance_kph && <span className="text-error text-[12px]">{formErrors.max_wind_resistance_kph}</span>}
                 </div>
                 <div className="flex flex-col gap-xs">
-                  <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Kháng gió giật (km/h)</label>
-                  <input type="number" step="0.1" className="bg-surface-container-highest border border-outline-variant rounded px-sm py-xs text-on-surface focus:outline-none focus:border-primary" 
+                  <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Kháng gió giật (km/h) <span className="text-error">*</span></label>
+                  <input type="number" step="0.1" className={`bg-surface-container-highest border rounded px-sm py-xs text-on-surface focus:outline-none ${formErrors.max_gust_resistance_kph ? 'border-error' : 'border-outline-variant focus:border-primary'}`} 
                     value={formData.max_gust_resistance_kph} onChange={e => setFormData({...formData, max_gust_resistance_kph: parseFloat(e.target.value)})} required />
+                  {formErrors.max_gust_resistance_kph && <span className="text-error text-[12px]">{formErrors.max_gust_resistance_kph}</span>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-md">
                 <div className="flex flex-col gap-xs">
-                  <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Dung tích bình (Lít)</label>
-                  <input type="number" step="0.1" className="bg-surface-container-highest border border-outline-variant rounded px-sm py-xs text-on-surface focus:outline-none focus:border-primary" 
+                  <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Dung tích bình (Lít) <span className="text-error">*</span></label>
+                  <input type="number" step="0.1" className={`bg-surface-container-highest border rounded px-sm py-xs text-on-surface focus:outline-none ${formErrors.tank_capacity_liters ? 'border-error' : 'border-outline-variant focus:border-primary'}`} 
                     value={formData.tank_capacity_liters} onChange={e => setFormData({...formData, tank_capacity_liters: parseFloat(e.target.value)})} required />
+                  {formErrors.tank_capacity_liters && <span className="text-error text-[12px]">{formErrors.tank_capacity_liters}</span>}
                 </div>
                 <div className="flex flex-col gap-xs">
                   <label className="font-label-caps text-label-caps text-on-surface-variant uppercase">Loại vòi phun</label>
