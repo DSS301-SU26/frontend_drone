@@ -328,7 +328,16 @@ export function AppProvider({ children }) {
   );
 
   // === Handlers for safety config ===
-  const updateRuleField = (key, value) => setRuleForm((f) => ({ ...f, [key]: value }));
+  const updateRuleField = (key, value) => setRuleForm((f) => {
+    const val = Number(value);
+    const next = { ...f, [key]: val };
+    if (key === "max_rain_probability" && val > next.return_to_charging_rain_probability) {
+      next.return_to_charging_rain_probability = val;
+    } else if (key === "return_to_charging_rain_probability" && val < next.max_rain_probability) {
+      next.max_rain_probability = val;
+    }
+    return next;
+  });
 
   const saveDecisionRules = async () => {
     setSavingRules(true);
