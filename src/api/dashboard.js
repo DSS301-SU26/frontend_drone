@@ -24,6 +24,14 @@ export function getDronesList() {
   return request("/api/drones");
 }
 
+export function editPlot(plotId, payload) {
+  return request(`/api/plots/${encodeURIComponent(plotId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function addDrone(dronePayload) {
   return request("/api/drones", {
     method: "POST",
