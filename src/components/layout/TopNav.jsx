@@ -155,22 +155,7 @@ export default function TopNav() {
       </div>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-md">
-        <div className="flex gap-xs">
-          <button
-            className="p-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-full transition-all duration-200 relative"
-            onClick={() => setNotificationOpen(!notificationOpen)}
-          >
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button className="p-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded-full transition-all duration-200">
-            <span className="material-symbols-outlined">settings</span>
-          </button>
-        </div>
-        <div className="w-8 h-8 rounded-full border border-outline-variant overflow-hidden cursor-pointer bg-surface-container-high flex items-center justify-center text-primary text-sm font-bold">
-          OP
-        </div>
-      </div>
+
     </header>
   );
 }

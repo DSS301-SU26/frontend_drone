@@ -4,8 +4,6 @@ const navItems = [
   { id: "mission-control", label: "Mission Control", icon: "precision_manufacturing" },
   { id: "drone-fleet", label: "Drone Fleet", icon: "flight" },
   { id: "terrain-maps", label: "Terrain Maps", icon: "layers" },
-  { id: "ai-insights", label: "AI Insights", icon: "psychology" },
-  { id: "safety-logs", label: "Safety Logs", icon: "security" },
 ];
 
 export default function Sidebar() {
@@ -59,22 +57,6 @@ export default function Sidebar() {
         })}
       </div>
 
-      <div className="mt-auto flex flex-col gap-xs pt-md border-t border-outline-variant">
-        <a
-          href="#"
-          className="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors duration-150"
-        >
-          <span className="material-symbols-outlined">settings</span>
-          <span className="font-label-caps text-label-caps">Settings</span>
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-md px-md py-sm text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors duration-150"
-        >
-          <span className="material-symbols-outlined">help</span>
-          <span className="font-label-caps text-label-caps">Support</span>
-        </a>
-      </div>
     </nav>
   );
 }

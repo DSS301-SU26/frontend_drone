@@ -3,7 +3,6 @@ import SafetyConfig from "./SafetyConfig";
 import RecommendationPanel from "./RecommendationPanel";
 import AiModelComparison from "./AiModelComparison";
 import ResourceEstimator from "./ResourceEstimator";
-import AwdIrrigationWidget from "./AwdIrrigationWidget";
 
 export default function MissionControl() {
   return (
@@ -16,7 +15,6 @@ export default function MissionControl() {
         <RecommendationPanel />
         <AiModelComparison />
         <ResourceEstimator />
-        <AwdIrrigationWidget />
       </div>
     </div>
   );
