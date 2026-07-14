@@ -23,8 +23,8 @@ export const actionConfig = {
     description: "Gió hoặc gió giật đã vượt ngưỡng an toàn. Khóa phun giúp tránh trôi dạt hóa chất và mất ổn định UAV.",
   },
   NO_FLY: {
-    title: "Đưa UAV về trạm sạc",
-    short: "Về trạm sạc",
+    title: "Cấm bay",
+    short: "Cấm bay",
     risk: "Cao",
     tone: "dry",
     description: "Mưa hoặc thời tiết nguy hiểm đang hiện diện. UAV cần quay về trạm sạc để bảo vệ thiết bị.",
@@ -377,7 +377,7 @@ export function translatePrediction(pred) {
     FLY: "CẤT CÁNH",
     DELAY: "HOÃN BAY",
     LOCK_SPRAY: "KHÓA PHUN",
-    NO_FLY: "VỀ TRẠM SẠC",
+    NO_FLY: "CẤM BAY",
   };
   return mapping[pred] ?? pred;
 }
