@@ -230,6 +230,24 @@ export function AppProvider({ children }) {
     setRuleForm(dashboard.decision_config.thresholds);
   }, [dashboard?.decision_config]);
 
+  // Sync ruleForm limits with the currently selected drone
+  useEffect(() => {
+    const activeDrone = droneList?.find(d => d.model_name === droneModel);
+    if (activeDrone && ruleForm) {
+      setRuleForm(prev => {
+        if (prev.max_wind_speed === activeDrone.max_wind_resistance_kph && 
+            prev.max_wind_gust === activeDrone.max_gust_resistance_kph) {
+          return prev;
+        }
+        return {
+          ...prev,
+          max_wind_speed: activeDrone.max_wind_resistance_kph,
+          max_wind_gust: activeDrone.max_gust_resistance_kph
+        };
+      });
+    }
+  }, [droneModel, droneList, dashboard?.decision_config]);
+
   useEffect(() => {
     let midnightTimeout;
     const refreshIfNewDay = async () => {

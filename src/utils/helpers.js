@@ -586,3 +586,42 @@ export function getTooltipLeft(index, count) {
   if (index === null || count <= 1) return 0;
   return clamp((index / (count - 1)) * 100, 8, 92);
 }
+
+export function simulateSafetyDecision(ruleForm, weather) {
+  if (!weather || !ruleForm) return "FLY";
+  
+  // Parse rules
+  const maxWind = Number(ruleForm.max_wind_speed) || 28.8;
+  const maxGust = Number(ruleForm.max_wind_gust) || 28.8;
+  const maxRainProb = Number(ruleForm.max_rain_probability) || 50;
+  const maxRainHourly = Number(ruleForm.max_rain_hourly) || 2.0;
+  const maxCloud = Number(ruleForm.max_cloud_cover) || 80;
+  const minVis = Number(ruleForm.min_visibility) || 1000;
+  const maxTemp = Number(ruleForm.max_safe_temperature) || 35;
+  
+  // Read current weather
+  const wind = Number(weather.wind_speed) || 0;
+  const gust = Number(weather.wind_gust) || 0;
+  const rainProb = Number(weather.precipitation_probability) || 0;
+  const rain = Number(weather.precipitation) || 0;
+  const cloud = Number(weather.cloud_cover) || 0;
+  const vis = Number(weather.visibility) || 10000;
+  const temp = Number(weather.temperature) || 25;
+
+  // Hard Limits -> NO_FLY
+  if (wind > maxWind || gust > maxGust || rain > maxRainHourly || vis < minVis) {
+    return "NO_FLY";
+  }
+
+  // Soft Limits / Lock Spray
+  if (rainProb > maxRainProb || cloud > maxCloud) {
+    return "LOCK_SPRAY"; 
+  }
+
+  // Delay
+  if (temp > maxTemp) {
+    return "DELAY";
+  }
+
+  return "FLY";
+}
