@@ -1,22 +1,14 @@
-import { useMemo } from "react";
 import { useApp } from "../../context/AppContext";
-import { ruleFields, simulateSafetyDecision, actionConfig } from "../../utils/helpers";
+import { ruleFields } from "../../utils/helpers";
 
 export default function SafetyConfig() {
   const {
     ruleForm, ruleSourceLabel, savingRules, droneModel,
     updateRuleField, saveDecisionRules, resetDecisionRules,
-    dashboard, selectedSlot
   } = useApp();
 
   // All 7 rules
   const visibleRules = ruleFields;
-
-  const simulatedDecision = useMemo(() => {
-    const weather = dashboard?.slots?.[selectedSlot]?.weather || dashboard?.current;
-    const decisionKey = simulateSafetyDecision(ruleForm, weather);
-    return actionConfig[decisionKey] || actionConfig.FLY;
-  }, [ruleForm, dashboard, selectedSlot]);
 
   return (
     <div className="col-span-1 md:col-span-4 bg-surface-container rounded-xl border border-surface-variant p-lg flex flex-col">
@@ -62,19 +54,7 @@ export default function SafetyConfig() {
         })}
       </div>
 
-      {/* Preview Box */}
-      <div className={`mt-md p-sm rounded-lg flex items-start gap-sm border 
-        ${simulatedDecision.tone === 'healthy' ? 'bg-primary-container text-on-primary-container border-primary' : 
-          simulatedDecision.tone === 'dry' ? 'bg-error-container text-on-error-container border-error' : 
-          'bg-secondary-container text-on-secondary-container border-secondary'}`}>
-        <span className="material-symbols-outlined mt-0.5">
-          {simulatedDecision.tone === 'healthy' ? 'check_circle' : simulatedDecision.tone === 'dry' ? 'cancel' : 'warning'}
-        </span>
-        <div>
-          <div className="font-bold text-[13px]">Mô phỏng tức thời: {simulatedDecision.short}</div>
-          <div className="text-[11px] opacity-80">{simulatedDecision.description}</div>
-        </div>
-      </div>
+
 
       <div className="flex gap-sm mt-lg">
         <button
