@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useApp } from "../../context/AppContext";
-import { editPlot } from "../../api/dashboard";
+import { editPlot, getLocations } from "../../api/dashboard";
 
 const getRiceSvg = (color) => {
   return `data:image/svg+xml;utf8,` + encodeURIComponent(`
@@ -15,7 +15,7 @@ const getRiceSvg = (color) => {
 };
 
 export default function TerrainMaps() {
-  const { locationId, locations, droneState } = useApp();
+  const { locationId, locations, setLocations, droneState, loadDashboard } = useApp();
   const activePlot = locations.find((l) => l.id === locationId) || locations[0];
 
   const [isEditing, setIsEditing] = useState(false);
@@ -82,7 +82,11 @@ export default function TerrainMaps() {
         current_pesticide: editForm.current_pesticide
       });
       setIsEditing(false);
-      window.location.reload();
+      const data = await getLocations();
+      if (data && data.length > 0) {
+        setLocations(data);
+      }
+      await loadDashboard(true, true);
     } catch (e) {
       alert("Lỗi khi lưu thông tin: " + e.message);
     } finally {

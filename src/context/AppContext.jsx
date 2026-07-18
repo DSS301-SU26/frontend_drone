@@ -462,7 +462,7 @@ export function AppProvider({ children }) {
 
   const value = {
     // Data
-    locations, locationId, setLocationId, droneList, setDroneList, dashboard, slots, current, action, activeRisk,
+    locations, setLocations, locationId, setLocationId, droneList, setDroneList, dashboard, slots, current, action, activeRisk,
     selectedSlot, setSelectedSlot, activeNav, setActiveNav, timelineTiles, analytics,
     operationTimestamp, setOperationTimestamp, operationTile, nextSafeSlot,
     canSchedule, decisionConfig, activeDecisionConfig, ruleForm, ruleSourceLabel,
