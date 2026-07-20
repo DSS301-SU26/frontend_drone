@@ -315,6 +315,8 @@ export default function RecommendationPanel() {
           </div>
         </div>
       )}
+        </>
+      )}
     </div>
   );
 }
