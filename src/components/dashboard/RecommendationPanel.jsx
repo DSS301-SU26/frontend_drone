@@ -53,8 +53,6 @@ export default function RecommendationPanel() {
         <span className="bg-surface-bright border border-outline-variant rounded-full px-3 py-1 text-[11px] font-data-mono font-bold text-primary shadow-[0_0_10px_rgba(75,221,183,0.1)]">v2.0</span>
       </div>
 
-      </div>
-
       {!selectedDetailsDrone ? (
         <div className="flex-1 flex flex-col items-center justify-center py-10 opacity-60 border border-outline-variant rounded-2xl bg-surface-container-lowest">
            <span className="material-symbols-outlined text-4xl mb-2">ads_click</span>
