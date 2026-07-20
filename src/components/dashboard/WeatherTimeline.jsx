@@ -161,10 +161,17 @@ export default function WeatherTimeline() {
                       )}
                     </td>
                     <td className="p-sm text-center font-data-mono font-bold text-[11px] text-on-surface">
-                      {Object.entries(slot.decision_engine?.drones_eval || {})
-                         .filter(([_, evalData]) => evalData.decision === "FLY")
-                         .map(([name]) => name)
-                         .join(", ") || "-"}
+                      {(() => {
+                         const flyingDrones = Object.entries(slot.decision_engine?.drones_eval || {})
+                           .filter(([_, evalData]) => evalData.decision === "FLY")
+                           .map(([name]) => name);
+                         if (flyingDrones.length === 0) return "-";
+                         return (
+                           <div className="truncate max-w-[120px] mx-auto" title={flyingDrones.join(", ")}>
+                             {flyingDrones.join(", ")}
+                           </div>
+                         );
+                      })()}
                     </td>
                     <td className="p-sm text-center">
                       {wasOverridden ? (
