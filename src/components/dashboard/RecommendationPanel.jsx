@@ -156,13 +156,6 @@ export default function RecommendationPanel() {
               <div className="h-full rounded-full transition-all duration-500" style={{ width: `${scorePercent}%`, backgroundColor: riskColor }}></div>
             </div>
 
-            <div className="flex justify-between items-end mb-xs">
-              <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM AN TOÀN CÂY TRỒNG</span>
-              <span className="font-bold text-primary">{Math.round(cropImpactScore)}</span>
-            </div>
-            <div className="w-full bg-surface-container-lowest h-1.5 rounded-full overflow-hidden mb-sm">
-              <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${cropImpactScore}%` }}></div>
-            </div>
 
             <div className="flex justify-between items-end mb-xs">
               <span className="font-label-caps text-[10px] text-on-surface-variant uppercase">ĐIỂM CHẤT LƯỢNG PHUN</span>
@@ -173,11 +166,10 @@ export default function RecommendationPanel() {
             </div>
           </div>
 
-        {/* 3 điểm rủi ro DSS (BRD §2.2) */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* 2 điểm rủi ro DSS (BRD §2.2) */}
+        <div className="grid grid-cols-2 gap-2">
           {[
             { label: "An toàn bay", value: scorePercent, color: riskColor },
-            { label: "Tác động lúa", value: cropScore, color: "#6fb3ff" },
             { label: "Chất lượng phun", value: sprayScore, color: "#c9a0ff" },
           ].map((s) => (
             <div key={s.label} className="bg-surface-container-lowest border border-outline-variant rounded-lg p-sm flex flex-col items-center gap-1">
