@@ -7,8 +7,8 @@ export default function SafetyConfig() {
     updateRuleField, saveDecisionRules, resetDecisionRules,
   } = useApp();
 
-  // All 7 rules
-  const visibleRules = ruleFields;
+  // Filter out drone-locked rules
+  const visibleRules = ruleFields.filter(f => f.key !== "max_wind_speed" && f.key !== "max_wind_gust");
 
   return (
     <div className="col-span-1 md:col-span-4 bg-surface-container rounded-xl border border-surface-variant p-lg flex flex-col">

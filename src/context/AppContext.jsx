@@ -122,8 +122,27 @@ export function AppProvider({ children }) {
       const payload = await getDashboardSlots(locationForApi, null, activePlot.area_hectares || activePlot.area || 10.0, distanceKm, droneModel, pesticide, activePlot.current_crop_stage || activePlot.cropStage || "TILLERING");
       setDashboard(payload);
       if (!keepSelected) {
-        setSelectedSlot(0);
-        setOperationTimestamp(payload.slots?.[0]?.timestamp || "");
+        let targetIndex = 0;
+        if (payload.slots && payload.slots.length > 0) {
+          const now = new Date();
+          const currentHour = now.getHours();
+          const y = now.getFullYear();
+          const m = String(now.getMonth() + 1).padStart(2, '0');
+          const d = String(now.getDate()).padStart(2, '0');
+          const currentDateString = `${y}-${m}-${d}`;
+
+          const matchingIndex = payload.slots.findIndex(slot => {
+            if (!slot.timestamp?.startsWith(currentDateString)) return false;
+            const time = slot.timestamp?.includes("T") ? slot.timestamp.split("T")[1].substring(0, 5) : "";
+            const slotHour = time ? Number(time.split(":")[0]) : null;
+            return slotHour === currentHour;
+          });
+          if (matchingIndex !== -1) {
+            targetIndex = matchingIndex;
+          }
+        }
+        setSelectedSlot(targetIndex);
+        setOperationTimestamp(payload.slots?.[targetIndex]?.timestamp || "");
       }
       setDroneOpen(false);
       setDroneState("DOCKED");

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useApp } from "../../context/AppContext";
 import { formatDateTime, formatDateOnly, formatNumber, formatVisibility, translateWeatherDescription } from "../../utils/helpers";
 
@@ -6,6 +7,17 @@ export default function WeatherTimeline() {
     dashboard, slots, selectedSlot, setSelectedSlot,
     slotViewMode, setSlotViewMode, current,
   } = useApp();
+
+  const timelineRef = useRef(null);
+
+  useEffect(() => {
+    if (slotViewMode === "timeline" && timelineRef.current) {
+      const selectedBtn = timelineRef.current.children[selectedSlot];
+      if (selectedBtn) {
+        selectedBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [selectedSlot, slotViewMode]);
 
   const targetSlot = current;
   const visibilityText = formatVisibility(targetSlot?.visibility);
@@ -19,8 +31,6 @@ export default function WeatherTimeline() {
     { label: "Tốc độ gió", value: targetSlot?.wind_speed, unit: "", icon: "air", colorClass: "text-[#5A9EE5]", borderClass: "border-[#1F2F3A]", note: `Gió giật ${formatNumber(targetSlot?.wind_gust)} km/h` },
     { label: "Độ ẩm", value: targetSlot?.humidity, unit: "%", icon: "water_drop", colorClass: "text-primary", borderClass: "border-[#1F3A3A]", note: `Mây ${formatNumber(targetSlot?.cloud_cover)}% - ${visibilityText}` },
     { label: "Khả năng mưa", value: targetSlot?.rain_probability, unit: "%", icon: "rainy", colorClass: "text-[#B45AE5]", borderClass: "border-[#2D1F3A]", note: precipitationText },
-    { label: "Bốc hơi nước", value: targetSlot?.evapotranspiration != null ? formatNumber(targetSlot.evapotranspiration) : "0", unit: " ET₀", icon: "ev_station", colorClass: "text-[#5AE58E]", borderClass: "border-[#1F3A2D]", note: "Chỉ số bốc hơi nước" },
-    { label: "Độ ẩm đất", value: targetSlot?.soil_moisture != null ? formatNumber(targetSlot.soil_moisture) : "0.5", unit: "%", icon: "grass", colorClass: "text-[#C5E55A]", borderClass: "border-[#333A1F]", note: "Độ ẩm tầng đất 0-7cm" },
   ];
 
   if (!dashboard) return null;
@@ -61,7 +71,7 @@ export default function WeatherTimeline() {
       {slotViewMode === "timeline" ? (
         <>
           {/* Timeline */}
-          <div className="flex gap-sm overflow-x-auto timeline-scroll pb-sm">
+          <div ref={timelineRef} className="flex gap-sm overflow-x-auto timeline-scroll pb-sm">
         {slots.map((slot, index) => {
           const isSelected = selectedSlot === index;
           return (
@@ -175,7 +185,7 @@ export default function WeatherTimeline() {
       )}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-sm mt-sm">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-sm mt-sm">
         {weatherMetrics.map(({ label, value, unit, icon, colorClass, borderClass, note }) => (
           <div key={label} className={`bg-surface border ${borderClass} p-sm rounded-lg flex flex-col justify-between h-24`}>
             <div className={`flex items-center gap-xs ${colorClass}`}>
