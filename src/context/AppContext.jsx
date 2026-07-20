@@ -57,6 +57,7 @@ export function AppProvider({ children }) {
   const [locationId, setLocationId] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(0);
+  const [selectedDetailsDrone, setSelectedDetailsDrone] = useState(null);
   const [activeNav, setActiveNav] = useState("mission-control");
   const [operationTimestamp, setOperationTimestamp] = useState("");
   const [decisionConfig, setDecisionConfig] = useState(null);
@@ -482,7 +483,7 @@ export function AppProvider({ children }) {
   const value = {
     // Data
     locations, setLocations, locationId, setLocationId, droneList, setDroneList, dashboard, slots, current, action, activeRisk,
-    selectedSlot, setSelectedSlot, activeNav, setActiveNav, timelineTiles, analytics,
+    selectedSlot, setSelectedSlot, selectedDetailsDrone, setSelectedDetailsDrone, activeNav, setActiveNav, timelineTiles, analytics,
     operationTimestamp, setOperationTimestamp, operationTile, nextSafeSlot,
     canSchedule, decisionConfig, activeDecisionConfig, ruleForm, ruleSourceLabel,
     pipelineRun, aiTraining, aiTrainingRun, notificationItems,

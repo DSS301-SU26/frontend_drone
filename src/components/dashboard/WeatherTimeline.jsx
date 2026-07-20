@@ -6,6 +6,7 @@ export default function WeatherTimeline() {
   const {
     dashboard, slots, selectedSlot, setSelectedSlot,
     slotViewMode, setSlotViewMode, current,
+    selectedDetailsDrone, setSelectedDetailsDrone, droneList
   } = useApp();
 
   const timelineRef = useRef(null);
@@ -105,10 +106,10 @@ export default function WeatherTimeline() {
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-outline-variant bg-surface-container">
                 <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold">Khung giờ</th>
-                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold">Khả năng bay</th>
+                {/* <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold">Khả năng bay</th> */}
                 <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold">AI Khuyến nghị</th>
                 <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">AI Đồng thuận</th>
-                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">Chu kỳ pin</th>
+                <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">Drones bay được</th>
                 <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">Quyết định QTV</th>
                 <th className="p-sm text-[11px] font-label-caps uppercase text-on-surface-variant font-bold text-center">Chi tiết</th>
               </tr>
@@ -116,11 +117,7 @@ export default function WeatherTimeline() {
             <tbody>
               {slots.map((slot, index) => {
                 const isSelected = selectedSlot === index;
-                const flyScore = slot.decision_engine?.flyability_score ?? 0;
-                const scorePercent = Math.round(flyScore * 100);
-                const isHighRisk = flyScore < 0.50;
-                const riskColor = isHighRisk ? "#ff4a4a" : flyScore >= 0.80 ? "#4bddb7" : "#f0bf63";
-                const originalDec = slot.decision_engine?.original_ai_decision || slot.decision_engine?.system_decision;
+                const originalDec = slot.decision_engine?.original_ai_decision || slot.decision_engine?.final_decision || slot.decision_engine?.system_decision;
                 const actionLabel = (originalDec === "FLY" || originalDec === "TAKE_OFF") ? "Cất cánh" :
                                    (originalDec === "NO_FLY" || originalDec === "RETURN_TO_CHARGING") ? "Cấm bay" :
                                    originalDec === "LOCK_SPRAY" ? "Khóa phun" : "Hoãn bay";
@@ -145,14 +142,14 @@ export default function WeatherTimeline() {
                       <div className="font-bold text-on-surface">{slot.time} -</div>
                       <div>{slot.end_time}</div>
                     </td>
-                    <td className="p-sm">
+                    {/* <td className="p-sm">
                       <div className="flex items-center gap-sm">
                         <div className="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${scorePercent}%`, backgroundColor: riskColor }}></div>
+                          <div className="h-full rounded-full" style={{ width: `0%`, backgroundColor: "gray" }}></div>
                         </div>
-                        <span className="font-data-mono text-[12px] font-bold" style={{ color: riskColor }}>{scorePercent}%</span>
+                        <span className="font-data-mono text-[12px] font-bold">-</span>
                       </div>
-                    </td>
+                    </td> */}
                     <td className="p-sm">
                       <span className={`px-2 py-1 rounded border ${actionBg} text-[11px] font-bold`}>{actionLabel}</span>
                     </td>
@@ -163,7 +160,12 @@ export default function WeatherTimeline() {
                         <span className="px-2 py-1 rounded border border-[#4a3f1c] text-[#f0bf63] text-[11px] font-bold">Xung đột</span>
                       )}
                     </td>
-                    <td className="p-sm text-center font-data-mono font-bold text-sm text-on-surface">0</td>
+                    <td className="p-sm text-center font-data-mono font-bold text-[11px] text-on-surface">
+                      {Object.entries(slot.decision_engine?.drones_eval || {})
+                         .filter(([_, evalData]) => evalData.decision === "FLY")
+                         .map(([name]) => name)
+                         .join(", ") || "-"}
+                    </td>
                     <td className="p-sm text-center">
                       {wasOverridden ? (
                         <span className={`font-data-mono text-[11px] font-bold ${overrideColor}`}>{overrideLabel}</span>
@@ -172,9 +174,21 @@ export default function WeatherTimeline() {
                       )}
                     </td>
                     <td className="p-sm text-center">
-                      <button className="flex items-center justify-center gap-1 mx-auto px-2 py-1 rounded border border-outline-variant bg-surface hover:bg-surface-container-high text-[11px] text-on-surface font-bold transition-colors">
-                        <span className="material-symbols-outlined text-[14px]">visibility</span> Xem
-                      </button>
+                      <select 
+                        className="bg-surface border border-outline-variant rounded p-1 text-[11px] text-on-surface outline-none cursor-pointer w-full text-center"
+                        value={isSelected && selectedDetailsDrone ? selectedDetailsDrone : ""}
+                        onChange={(e) => {
+                           e.stopPropagation();
+                           setSelectedSlot(index);
+                           setSelectedDetailsDrone(e.target.value);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="" disabled>Xem</option>
+                        {droneList.map(d => (
+                          <option key={d.model_name} value={d.model_name}>{d.model_name}</option>
+                        ))}
+                      </select>
                     </td>
                   </tr>
                 );

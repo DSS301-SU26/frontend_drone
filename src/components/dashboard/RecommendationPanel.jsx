@@ -15,7 +15,9 @@ const VERDICT_COLOR = { ALLOW: "#4bddb7", WARN: "#f0bf63", STOP: "#ff6b6b" };
 
 export default function RecommendationPanel() {
   const [showFactors, setShowFactors] = useState(false);
-  const { current, action, activeRisk, isOverriding, setIsOverriding, overrideDecisionValue, setOverrideDecisionValue, overrideNotes, setOverrideNotes, submittingOverride, handleOverrideDecision, handleRevertToAi, launchDrone } = useApp();
+  const { current, action, activeRisk, isOverriding, setIsOverriding, overrideDecisionValue, setOverrideDecisionValue, overrideNotes, setOverrideNotes, submittingOverride, handleOverrideDecision, handleRevertToAi, launchDrone, selectedDetailsDrone } = useApp();
+  
+  const droneEval = selectedDetailsDrone && current?.decision_engine?.drones_eval ? current.decision_engine.drones_eval[selectedDetailsDrone] : null;
 
   const flyScore = current?.decision_engine?.flyability_score ?? 0;
   const scorePercent = Math.round(flyScore * 100);
@@ -39,7 +41,7 @@ export default function RecommendationPanel() {
     DELAY: "schedule",
     LOCK_SPRAY: "water_drop",
     NO_FLY: "block"
-  }[current?.decision_action] || "info";
+  }[droneEval?.decision || current?.decision_action] || "info";
 
   return (
     <div className="col-span-1 md:col-span-4 bg-surface-container rounded-xl border border-surface-variant p-lg flex flex-col gap-md shadow-lg">
@@ -51,8 +53,17 @@ export default function RecommendationPanel() {
         <span className="bg-surface-bright border border-outline-variant rounded-full px-3 py-1 text-[11px] font-data-mono font-bold text-primary shadow-[0_0_10px_rgba(75,221,183,0.1)]">v2.0</span>
       </div>
 
-      <div className={`relative overflow-hidden rounded-2xl border ${cardBorder} shadow-2xl transition-all duration-500`}
-           style={{ background: `linear-gradient(145deg, ${cardBg}, #0a0a0a)` }}>
+      </div>
+
+      {!selectedDetailsDrone ? (
+        <div className="flex-1 flex flex-col items-center justify-center py-10 opacity-60 border border-outline-variant rounded-2xl bg-surface-container-lowest">
+           <span className="material-symbols-outlined text-4xl mb-2">ads_click</span>
+           <p className="text-sm">Vui lòng chọn Drone từ bảng (cột Chi tiết) để xem phân tích.</p>
+        </div>
+      ) : (
+        <>
+          <div className={`relative overflow-hidden rounded-2xl border ${cardBorder} shadow-2xl transition-all duration-500`}
+               style={{ background: `linear-gradient(145deg, ${cardBg}, #0a0a0a)` }}>
         
         {/* Dynamic Animated Glow Effect */}
         <div className="absolute -top-20 -right-20 w-64 h-64 blur-[80px] opacity-30 rounded-full animate-pulse" 

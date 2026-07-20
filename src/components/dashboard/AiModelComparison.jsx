@@ -1,7 +1,7 @@
 import { useApp } from "../../context/AppContext";
 
 export default function AiModelComparison() {
-  const { current } = useApp();
+  const { current, selectedDetailsDrone } = useApp();
 
   const championScore = current?.decision_engine?.champion_score != null
     ? Math.round(current.decision_engine.champion_score * 100) : 0;
@@ -16,7 +16,14 @@ export default function AiModelComparison() {
         <h3 className="font-headline-sm text-headline-sm font-bold">Dual-ML AI Prediction</h3>
       </div>
 
-      <div className="flex gap-sm mt-sm">
+      {!selectedDetailsDrone ? (
+        <div className="flex-1 flex flex-col items-center justify-center py-10 opacity-60 border border-outline-variant rounded-2xl bg-surface-container-lowest mt-sm">
+           <span className="material-symbols-outlined text-4xl mb-2">ads_click</span>
+           <p className="text-sm">Vui lòng chọn Drone từ bảng để xem chi tiết</p>
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-sm mt-sm">
         {/* Champion: Random Forest */}
         <div className="flex-1 bg-surface border border-outline-variant rounded-lg p-sm flex flex-col justify-between">
           <div>
@@ -77,6 +84,8 @@ export default function AiModelComparison() {
             </p>
           </div>
         </div>
+        )}
+        </>
       )}
     </div>
   );

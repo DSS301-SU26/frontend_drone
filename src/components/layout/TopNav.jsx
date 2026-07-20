@@ -102,7 +102,8 @@ export default function TopNav() {
 
         <div className="w-px h-6 bg-outline-variant mx-xs"></div>
 
-        {/* Drone Selector */}
+        {/* Drone Selector (Hidden as requested, selection is now per-slot) */}
+        {/*
         <Dropdown
           id="drone"
           trigger={
@@ -130,6 +131,7 @@ export default function TopNav() {
             </div>
           ))}
         </Dropdown>
+        */}
 
         {/* Pesticide Display (Read-only) */}
         <div className="flex items-center bg-surface-container border border-outline-variant rounded-lg px-md py-xs gap-sm opacity-80" title="Loại thuốc lấy tự động từ CSDL cánh đồng">
