@@ -21,7 +21,7 @@ export default function WeatherTimeline() {
   const {
     dashboard, slots, selectedSlot, setSelectedSlot,
     slotViewMode, setSlotViewMode, current,
-    selectedDetailsDrone, setSelectedDetailsDrone, droneList, droneModel
+    selectedDetailsDrone, setSelectedDetailsDrone, droneList, droneModel, setDroneModel
   } = useApp();
 
   const timelineRef = useRef(null);

@@ -242,7 +242,7 @@ export function AppProvider({ children }) {
   }, []);
 
   useEffect(() => { loadAiTraining(); }, [loadAiTraining]);
-  useEffect(() => { loadDashboard(); }, [loadDashboard]);
+  useEffect(() => { loadDashboard(false, true); }, [loadDashboard]);
   useEffect(() => { if (dashboard?.source?.updated_at) loadAiTraining(); }, [dashboard?.source?.updated_at, loadAiTraining]);
   useEffect(() => {
     if (!dashboard?.decision_config?.thresholds) return;
