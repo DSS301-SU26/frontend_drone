@@ -48,7 +48,9 @@ export default function RecommendationPanel() {
       <div className="flex justify-between items-center mb-sm">
         <div>
           <h2 className="font-label-caps text-primary text-[10px] uppercase tracking-[0.2em] mb-1">Hệ Thống Trí Tuệ Nhân Tạo</h2>
-          <h3 className="font-headline-sm text-headline-sm font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Decision Engine Output</h3>
+          <h3 className="font-headline-sm text-headline-sm font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+            Decision Engine Output {selectedDetailsDrone ? `- ${selectedDetailsDrone}` : ""}
+          </h3>
         </div>
         <span className="bg-surface-bright border border-outline-variant rounded-full px-3 py-1 text-[11px] font-data-mono font-bold text-primary shadow-[0_0_10px_rgba(75,221,183,0.1)]">v2.0</span>
       </div>
