@@ -2,11 +2,26 @@ import { useEffect, useRef } from "react";
 import { useApp } from "../../context/AppContext";
 import { formatDateTime, formatDateOnly, formatNumber, formatVisibility, translateWeatherDescription } from "../../utils/helpers";
 
+// Chuan hoa ten quyet dinh giua 2 bo ten cua BE (FLY/NO_FLY vs TAKE_OFF/RETURN_TO_CHARGING)
+const DECISION_ALIASES = {
+  TAKE_OFF: "FLY",
+  FLY: "FLY",
+  DELAY_FLIGHT: "DELAY",
+  DELAY: "DELAY",
+  LOCK_SPRAY: "NO_FLY",
+  RETURN_TO_CHARGING: "NO_FLY",
+  NO_FLY: "NO_FLY",
+};
+
+function normalizeDecision(dec) {
+  return DECISION_ALIASES[dec] ?? dec;
+}
+
 export default function WeatherTimeline() {
   const {
     dashboard, slots, selectedSlot, setSelectedSlot,
     slotViewMode, setSlotViewMode, current,
-    selectedDetailsDrone, setSelectedDetailsDrone, droneList
+    selectedDetailsDrone, setSelectedDetailsDrone, droneList, droneModel
   } = useApp();
 
   const timelineRef = useRef(null);
@@ -125,6 +140,7 @@ export default function WeatherTimeline() {
                                (originalDec === "NO_FLY" || originalDec === "RETURN_TO_CHARGING") ? "border-[#4a1c1c] text-[#ff4a4a]" :
                                originalDec === "LOCK_SPRAY" ? "border-[#4a1c1c] text-[#ff4a4a]" : "border-[#4a3f1c] text-[#f0bf63]";
                 
+                const targetDec = normalizeDecision(originalDec);
                 const overrideDec = slot.decision_engine?.system_decision;
                 const overrideLabel = (overrideDec === "FLY" || overrideDec === "TAKE_OFF") ? "Cất cánh" :
                                    (overrideDec === "NO_FLY" || overrideDec === "RETURN_TO_CHARGING") ? "Cấm bay" :
@@ -162,13 +178,20 @@ export default function WeatherTimeline() {
                     </td>
                     <td className="p-sm text-center font-data-mono font-bold text-[11px] text-on-surface">
                       {(() => {
-                         const flyingDrones = Object.entries(slot.decision_engine?.drones_eval || {})
-                           .filter(([_, evalData]) => {
-                             if (originalDec === "FLY" || originalDec === "TAKE_OFF") return evalData.decision === "FLY";
-                             if (originalDec === "DELAY") return evalData.decision === "DELAY";
-                             return false;
-                           })
-                           .map(([name]) => name);
+                         const dronesEval = slot.decision_engine?.drones_eval
+                           || slot.decision_engine?.drone_evaluations
+                           || slot.drones_eval;
+                         const flyingDrones = dronesEval
+                           ? Object.entries(dronesEval)
+                               .filter(([_, evalData]) => {
+                                 const dec = normalizeDecision(evalData?.decision || evalData?.final_decision || evalData?.system_decision);
+                                 if (targetDec === "FLY") return dec === "FLY";
+                                 if (targetDec === "DELAY") return dec === "DELAY" || dec === "FLY";
+                                 return false;
+                               })
+                               .map(([name]) => name)
+                           // BE khong tra ve danh gia tung drone -> hien drone dang duoc chon de tinh khuyen nghi
+                           : (targetDec === "FLY" || targetDec === "DELAY") && droneModel ? [droneModel] : [];
                          if (flyingDrones.length === 0) return "-";
                          return (
                            <div className="truncate max-w-[120px] mx-auto" title={flyingDrones.join(", ")}>
