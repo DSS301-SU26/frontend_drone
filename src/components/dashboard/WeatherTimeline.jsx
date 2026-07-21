@@ -163,7 +163,7 @@ export default function WeatherTimeline() {
                     <td className="p-sm text-center font-data-mono font-bold text-[11px] text-on-surface">
                       {(() => {
                          const flyingDrones = Object.entries(slot.decision_engine?.drones_eval || {})
-                           .filter(([_, evalData]) => evalData.decision === "FLY")
+                           .filter(([_, evalData]) => evalData.is_safe_to_fly)
                            .map(([name]) => name);
                          if (flyingDrones.length === 0) return "-";
                          return (
