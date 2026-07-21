@@ -178,20 +178,7 @@ export default function WeatherTimeline() {
                     </td>
                     <td className="p-sm text-center font-data-mono font-bold text-[11px] text-on-surface">
                       {(() => {
-                         const dronesEval = slot.decision_engine?.drones_eval
-                           || slot.decision_engine?.drone_evaluations
-                           || slot.drones_eval;
-                         const flyingDrones = dronesEval
-                           ? Object.entries(dronesEval)
-                               .filter(([_, evalData]) => {
-                                 const dec = normalizeDecision(evalData?.decision || evalData?.final_decision || evalData?.system_decision);
-                                 if (targetDec === "FLY") return dec === "FLY";
-                                 if (targetDec === "DELAY") return dec === "DELAY" || dec === "FLY";
-                                 return false;
-                               })
-                               .map(([name]) => name)
-                           // BE khong tra ve danh gia tung drone -> hien drone dang duoc chon de tinh khuyen nghi
-                           : (targetDec === "FLY" || targetDec === "DELAY") && droneModel ? [droneModel] : [];
+                         const flyingDrones = slot.capable_drones || [];
                          if (flyingDrones.length === 0) return "-";
                          return (
                            <div className="truncate max-w-[120px] mx-auto" title={flyingDrones.join(", ")}>
@@ -215,6 +202,7 @@ export default function WeatherTimeline() {
                            e.stopPropagation();
                            setSelectedSlot(index);
                            setSelectedDetailsDrone(e.target.value);
+                           setDroneModel(e.target.value); // Trigger API re-fetch for the new drone
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
